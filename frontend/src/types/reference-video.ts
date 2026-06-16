@@ -131,3 +131,80 @@ export interface PreflightReport {
     info_count: number;
   };
 }
+
+// ── Context Pack ────────────────────────────────────────────────────────
+
+export interface ContextPackStyleBible {
+  aspect_ratio: string;
+  style: string;
+  style_description: string;
+  visual_rules: string[];
+  forbidden_changes: string[];
+}
+
+export interface ContextPackCharacter {
+  name: string;
+  aliases: string[];
+  description: string;
+  referenced_shots: string[];
+  has_sheet: boolean;
+}
+
+export interface ContextPackScene {
+  name: string;
+  description: string;
+  referenced_shots: string[];
+  has_sheet: boolean;
+}
+
+export interface ContextPackProp {
+  name: string;
+  description: string;
+  referenced_shots: string[];
+  has_sheet: boolean;
+}
+
+export interface ContextPackProduct {
+  name: string;
+  brand: string;
+  description: string;
+  referenced_shots: string[];
+  has_any_images: boolean;
+}
+
+export interface ShotIntentEntry {
+  shot_id: string;
+  section: string;
+  duration_seconds: number;
+  voiceover_text: string;
+  visual_intent: string;
+  motion_intent: string;
+  referenced_assets: {
+    characters: string[];
+    scenes: string[];
+    props: string[];
+    products: string[];
+  };
+  prompt_ready: boolean;
+}
+
+export interface AssetReferenceState {
+  missing_assets: string[];
+  assets_without_sheet: string[];
+  shots_without_references: string[];
+}
+
+export interface ContextPack {
+  schema_version: number;
+  content_mode: string;
+  source_script: string;
+  logline: string;
+  theme: string;
+  style_bible: ContextPackStyleBible;
+  characters_with_aliases: ContextPackCharacter[];
+  scenes: ContextPackScene[];
+  props: ContextPackProp[];
+  products: ContextPackProduct[];
+  shot_intent_map: ShotIntentEntry[];
+  asset_reference_state: AssetReferenceState;
+}

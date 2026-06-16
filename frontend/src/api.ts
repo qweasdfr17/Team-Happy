@@ -50,7 +50,7 @@ import type {
 import type { GenerationMode } from "@/utils/generation-mode";
 import type { GridGeneration } from "@/types/grid";
 import type { Asset, AssetType, AssetCreatePayload, AssetUpdatePayload } from "@/types/asset";
-import type { PreflightReport } from "@/types/reference-video";
+import type { PreflightReport, ContextPack } from "@/types/reference-video";
 import type {
   AgentCredential,
   CreateAgentCredentialRequest,
@@ -2193,6 +2193,21 @@ class API {
   ): Promise<PreflightReport> {
     return this.request(
       `/projects/${encodeURIComponent(projectName)}/reference-videos/episodes/${episode}/preflight`,
+    );
+  }
+
+  /** 获取项目的 Context Pack（剧本理解包）。不存在返回 404。 */
+  static async getContextPack(projectName: string): Promise<ContextPack> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/context-pack`,
+    );
+  }
+
+  /** （重新）生成项目的 Context Pack。 */
+  static async regenerateContextPack(projectName: string): Promise<ContextPack> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/context-pack/regenerate`,
+      { method: "POST" },
     );
   }
 }

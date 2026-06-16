@@ -1279,6 +1279,12 @@ export default {
   'preflight_loading': 'Checking…',
   'preflight_failed': 'Preflight request failed',
 
+  // ---- Context Pack ----
+  'context_pack_generate': 'Generate Context Pack',
+  'context_pack_generate_short': 'Pack',
+  'context_pack_regenerated': 'Ready · {{shots}} shots {{chars}} chars',
+  'context_pack_regenerated_short': 'Pack ✓',
+
   // ---- Projects lobby · Darkroom ----
   'lobby_brand_subtitle': 'Studio',
   'lobby_search_placeholder': 'Search projects',

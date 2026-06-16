@@ -11,6 +11,7 @@ vi.mock("@/api", () => ({
     listAdReferenceUnits: vi.fn(),
     deriveAdReferenceUnits: vi.fn(),
     generateReferenceVideoUnit: vi.fn(),
+    getContextPack: vi.fn().mockRejectedValue(new Error("not found")),
     getFileUrl: vi.fn(() => "http://file/E1U1.mp4"),
   },
 }));

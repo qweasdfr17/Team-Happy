@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 from lib.app_data_dir import app_data_dir
 from lib.asset_fingerprints import compute_asset_fingerprints
 from lib.config.resolver import ConfigResolver
+from lib.context_pack import build_context_pack
 from lib.db import async_session_factory
 from lib.i18n import Translator
 from lib.profile_manifest import ContentMode
@@ -1338,4 +1339,86 @@ async def update_overview(name: str, req: UpdateOverviewRequest, _user: CurrentU
         raise
     except Exception:
         logger.exception("请求处理失败")
+        raise HTTPException(status_code=500, detail=_t("internal_server_error"))
+
+
+# ── Context Pack ────────────────────────────────────────────────────────
+
+
+@router.get("/projects/{name}/context-pack")
+async def get_context_pack(name: str, _user: CurrentUser, _t: Translator):
+    """获取项目的 Context Pack（剧本理解包）。
+
+    如果 context/context_pack.json 存在则直接返回；否则返回 404。
+    使用 POST regenerate 端点生成。
+    """
+    try:
+
+        def _load():
+            pm = get_project_manager()
+            path = pm.get_project_path(name) / "context" / "context_pack.json"
+            if not path.exists():
+                raise FileNotFoundError(path)
+            return json.loads(path.read_text(encoding="utf-8"))
+
+        return await asyncio.to_thread(_load)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=_t("not_found"))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("获取 context pack 失败")
+        raise HTTPException(status_code=500, detail=_t("internal_server_error"))
+
+
+@router.post("/projects/{name}/context-pack/regenerate")
+async def regenerate_context_pack(name: str, _user: CurrentUser, _t: Translator):
+    """（重新）生成项目的 Context Pack。
+
+    读取 project.json + scripts/episode_1.json，确定性提取剧本理解包，
+    写入 context/context_pack.json。
+    """
+    try:
+
+        def _regenerate():
+            pm = get_project_manager()
+            project = pm.load_project(name)
+            content_mode = project.get("content_mode", "")
+            if content_mode != "ad":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Context pack is only available for ad / short video projects",
+                )
+            # 从 project["episodes"] 找 episode==1 的 script_file
+            episodes = project.get("episodes")
+            script_file = ""
+            if isinstance(episodes, list):
+                for ep in episodes:
+                    if isinstance(ep, dict) and ep.get("episode") == 1:
+                        script_file = ep.get("script_file", "")
+                        break
+            if not script_file:
+                raise HTTPException(
+                    status_code=422,
+                    detail="Project has no episode 1 with a valid script_file",
+                )
+            script = pm.load_script(name, script_file)
+            pack = build_context_pack(project, script, source_script=script_file)
+
+            ctx_dir = pm.get_project_path(name) / "context"
+            ctx_dir.mkdir(parents=True, exist_ok=True)
+            out_path = ctx_dir / "context_pack.json"
+            out_path.write_text(
+                json.dumps(pack, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            return pack
+
+        return await asyncio.to_thread(_regenerate)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=_t("project_not_found", name=name))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("生成 context pack 失败")
         raise HTTPException(status_code=500, detail=_t("internal_server_error"))

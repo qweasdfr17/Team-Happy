@@ -9,10 +9,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { AlertTriangle, CheckCircle2, Info, Layers, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Info, Layers, RefreshCw, Sparkles } from "lucide-react";
 import { API } from "@/api";
 import { useTasksStore } from "@/stores/tasks-store";
-import type { AdReferenceUnit, AdShot, PreflightReport } from "@/types";
+import type { AdReferenceUnit, AdShot, ContextPack, PreflightReport } from "@/types";
 
 interface AdReferenceUnitsPanelProps {
   projectName: string;
@@ -87,6 +87,34 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
       void fetchPreflight();
     }
   }, [units, fetchPreflight]);
+
+  const [contextPack, setContextPack] = useState<ContextPack | null>(null);
+  const [ctxPackLoading, setCtxPackLoading] = useState(false);
+
+  // 初始化时尝试加载已有的 Context Pack（404 当作未生成，不报错）
+  useEffect(() => {
+    let cancelled = false;
+    API.getContextPack(projectName)
+      .then((pack) => {
+        if (!cancelled) setContextPack(pack);
+      })
+      .catch(() => {
+        // 404 / 其他错误均静默忽略，不影响 reference units 面板
+      });
+    return () => { cancelled = true; };
+  }, [projectName]);
+
+  const regenerateContextPack = async () => {
+    setCtxPackLoading(true);
+    try {
+      const pack = await API.regenerateContextPack(projectName);
+      setContextPack(pack);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setCtxPackLoading(false);
+    }
+  };
 
   const derive = async (): Promise<AdReferenceUnit[]> => {
     setDeriving(true);
@@ -175,6 +203,18 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
             <span>{t("ad_ref_generate_all")}</span>
           </button>
         )}
+        <button
+          type="button"
+          className="sv-navbtn inline-flex items-center gap-1.5"
+          disabled={ctxPackLoading}
+          onClick={() => void regenerateContextPack()}
+          title={contextPack
+            ? t("context_pack_regenerated", { shots: contextPack.shot_intent_map.length, chars: contextPack.characters_with_aliases.length })
+            : t("context_pack_generate")}
+        >
+          <BookOpen className="h-3 w-3" aria-hidden="true" />
+          <span>{ctxPackLoading ? "…" : contextPack ? t("context_pack_regenerated_short") : t("context_pack_generate_short")}</span>
+        </button>
       </div>
 
       {/* ── 预检摘要 ── */}

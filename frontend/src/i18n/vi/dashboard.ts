@@ -1328,6 +1328,12 @@ export default {
   'preflight_empty': 'Chưa có dữ liệu, hãy suy ra nhóm trước',
   'preflight_loading': 'Đang kiểm tra…',
   'preflight_failed': 'Yêu cầu kiểm tra thất bại',
+
+  // ---- Context Pack ----
+  'context_pack_generate': 'Tạo Context Pack',
+  'context_pack_generate_short': 'Pack',
+  'context_pack_regenerated': 'Đã sẵn sàng · {{shots}} cảnh {{chars}} nhân vật',
+  'context_pack_regenerated_short': 'Pack ✓',
   'workspace_nav_scenes': 'Cảnh',
   'workspace_nav_source': 'Tệp gốc',
   'workspace_notifications_title': 'Thông báo không gian làm việc',

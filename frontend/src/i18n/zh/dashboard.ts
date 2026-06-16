@@ -1280,6 +1280,12 @@ export default {
   'preflight_loading': '预检中…',
   'preflight_failed': '预检请求失败',
 
+  // ---- Context Pack ----
+  'context_pack_generate': '生成剧本理解包',
+  'context_pack_generate_short': '理解包',
+  'context_pack_regenerated': '已生成 · {{shots}} 镜 {{chars}} 角色',
+  'context_pack_regenerated_short': '理解包 ✓',
+
   // ---- 项目大厅 · Darkroom ----
   'lobby_brand_subtitle': '工作台',
   'lobby_search_placeholder': '搜索项目',
