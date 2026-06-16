@@ -50,6 +50,7 @@ import type {
 import type { GenerationMode } from "@/utils/generation-mode";
 import type { GridGeneration } from "@/types/grid";
 import type { Asset, AssetType, AssetCreatePayload, AssetUpdatePayload } from "@/types/asset";
+import type { PreflightReport } from "@/types/reference-video";
 import type {
   AgentCredential,
   CreateAgentCredentialRequest,
@@ -2182,6 +2183,16 @@ class API {
     return this.request(
       `/projects/${encodeURIComponent(projectName)}/reference-videos/episodes/${episode}/derive-units`,
       { method: "POST" },
+    );
+  }
+
+  /** 获取指定集的资产引用预检报告。 */
+  static async getPreflightReport(
+    projectName: string,
+    episode: number,
+  ): Promise<PreflightReport> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/reference-videos/episodes/${episode}/preflight`,
     );
   }
 }

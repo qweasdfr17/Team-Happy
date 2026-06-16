@@ -22,6 +22,7 @@ from lib.generation_queue_client import TaskSpec, TaskSpecValidationError
 from lib.i18n import Translator
 from lib.project_change_hints import project_change_source
 from lib.project_manager import EpisodeScriptReboundError, ProjectManager, effective_mode
+from lib.preflight import run_preflight
 from lib.reference_video import assemble_shots_text, parse_prompt
 from lib.reference_video.ad_units import (
     render_ad_unit_prompt,
@@ -254,6 +255,33 @@ async def derive_units(
     with _locked_episode_script(project_name, _episode_script_resolver(episode, _t, require_ad=True), _t) as script:
         units = sync_ad_reference_units(script, episode=episode, max_unit_duration=max_unit_duration)
     return {"units": units}
+
+
+@router.get("/episodes/{episode}/preflight")
+async def preflight_episode(
+    project_name: str,
+    episode: int,
+    _user: CurrentUser,
+    _t: Translator,
+) -> dict[str, Any]:
+    """对指定集的剧本执行资产引用预检，返回结构化报告。
+
+    ad 项目检查 shots[]（角色/场景/道具/产品引用完整性 + prompt 状态）；
+    narration/drama 暂未实现，返回空报告。
+    预检不阻塞生成，仅供前端展示与人工决策。
+    """
+    project, script, _sf = _load_episode_script(project_name, episode, _t)
+    # 本轮仅 ad 模式实现完整预检；narration/drama 返回空报告占位
+    content_mode = project.get("content_mode", "")
+    if content_mode != "ad":
+        return {
+            "blocking": [],
+            "warnings": [],
+            "info": [],
+            "summary": {"blocking_count": 0, "warning_count": 0, "info_count": 0},
+        }
+    report = run_preflight(project, script)
+    return report.to_dict()
 
 
 @router.post("/episodes/{episode}/units", status_code=status.HTTP_201_CREATED)

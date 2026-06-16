@@ -1269,6 +1269,16 @@ export default {
   'ad_ref_empty_hint': 'Reference-to-video groups consecutive shots into video units (up to 4 shots each) and generates videos directly from character/scene/prop reference images and asset sheets. Derive the groups first.',
   'workspace_nav_products': 'Products',
 
+  // ---- Preflight ----
+  'preflight_title': 'Preflight',
+  'preflight_blocking_count': '{{count}} blocking',
+  'preflight_warning_count': '{{count}} warnings',
+  'preflight_info_count': '{{count}} info',
+  'preflight_all_clear': 'Preflight passed, no issues',
+  'preflight_empty': 'No preflight data yet, derive groups first',
+  'preflight_loading': 'Checking…',
+  'preflight_failed': 'Preflight request failed',
+
   // ---- Projects lobby · Darkroom ----
   'lobby_brand_subtitle': 'Studio',
   'lobby_search_placeholder': 'Search projects',

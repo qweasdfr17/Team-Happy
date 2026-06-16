@@ -111,3 +111,23 @@ export interface ReferenceVideoScript {
   novel: { title: string; chapter: string };
   video_units: ReferenceVideoUnit[];
 }
+
+// ── Preflight ────────────────────────────────────────────────────────────
+
+export interface PreflightIssue {
+  severity: "blocking" | "warning" | "info";
+  code: string;
+  message: string;
+  location: string;
+}
+
+export interface PreflightReport {
+  blocking: PreflightIssue[];
+  warnings: PreflightIssue[];
+  info: PreflightIssue[];
+  summary: {
+    blocking_count: number;
+    warning_count: number;
+    info_count: number;
+  };
+}

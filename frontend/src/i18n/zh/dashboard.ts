@@ -1270,6 +1270,16 @@ export default {
   'ad_ref_empty_hint': '参考直出会把连续镜头自动分组为视频单元（每单元最多 4 个镜头），按角色/场景/道具参考图与资产设计图直接生成视频。先派生分组。',
   'workspace_nav_products': '产品',
 
+  // ---- 预检 ----
+  'preflight_title': '生成前预检',
+  'preflight_blocking_count': '{{count}} 项阻断',
+  'preflight_warning_count': '{{count}} 项提醒',
+  'preflight_info_count': '{{count}} 项提示',
+  'preflight_all_clear': '预检通过，无阻断或警告',
+  'preflight_empty': '暂无预检数据，先派生分组',
+  'preflight_loading': '预检中…',
+  'preflight_failed': '预检请求失败',
+
   // ---- 项目大厅 · Darkroom ----
   'lobby_brand_subtitle': '工作台',
   'lobby_search_placeholder': '搜索项目',

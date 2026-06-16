@@ -1318,6 +1318,16 @@ export default {
   'ad_ref_stale': 'Cảnh quay đã thay đổi, cần suy ra lại',
   'ad_ref_empty_hint': 'Video tham chiếu sẽ tự động nhóm các cảnh quay liên tiếp thành đơn vị video (tối đa 4 cảnh mỗi đơn vị) và tạo video trực tiếp từ ảnh tham chiếu sản phẩm và ảnh thiết kế. Hãy suy ra nhóm trước.',
   'workspace_nav_products': 'Sản phẩm',
+
+  // ---- Preflight ----
+  'preflight_title': 'Kiểm tra trước',
+  'preflight_blocking_count': '{{count}} chặn',
+  'preflight_warning_count': '{{count}} cảnh báo',
+  'preflight_info_count': '{{count}} thông tin',
+  'preflight_all_clear': 'Kiểm tra đạt, không có vấn đề',
+  'preflight_empty': 'Chưa có dữ liệu, hãy suy ra nhóm trước',
+  'preflight_loading': 'Đang kiểm tra…',
+  'preflight_failed': 'Yêu cầu kiểm tra thất bại',
   'workspace_nav_scenes': 'Cảnh',
   'workspace_nav_source': 'Tệp gốc',
   'workspace_notifications_title': 'Thông báo không gian làm việc',

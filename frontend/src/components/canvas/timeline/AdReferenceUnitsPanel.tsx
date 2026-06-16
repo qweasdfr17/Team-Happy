@@ -6,13 +6,13 @@
  * 提供（重新）派生分组与逐 unit / 全部生成入口。
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
-import { Layers, RefreshCw, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Layers, RefreshCw, Sparkles } from "lucide-react";
 import { API } from "@/api";
 import { useTasksStore } from "@/stores/tasks-store";
-import type { AdReferenceUnit, AdShot } from "@/types";
+import type { AdReferenceUnit, AdShot, PreflightReport } from "@/types";
 
 interface AdReferenceUnitsPanelProps {
   projectName: string;
@@ -66,12 +66,36 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
     [relevantTasks],
   );
 
+  const [preflight, setPreflight] = useState<PreflightReport | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+
+  const fetchPreflight = useCallback(async () => {
+    setPreflightLoading(true);
+    try {
+      const report = await API.getPreflightReport(projectName, episode);
+      setPreflight(report);
+    } catch {
+      setPreflight(null);
+    } finally {
+      setPreflightLoading(false);
+    }
+  }, [projectName, episode]);
+
+  // units 加载完后自动拉预检
+  useEffect(() => {
+    if (units !== null) {
+      void fetchPreflight();
+    }
+  }, [units, fetchPreflight]);
+
   const derive = async (): Promise<AdReferenceUnit[]> => {
     setDeriving(true);
     setError(null);
     try {
       const resp = await API.deriveAdReferenceUnits(projectName, episode);
       setUnits(resp.units);
+      // 派生后自动刷新预检
+      void fetchPreflight();
       return resp.units;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
@@ -153,6 +177,71 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
         )}
       </div>
 
+      {/* ── 预检摘要 ── */}
+      {hasUnits && (
+        <div className="mt-2 flex items-center gap-2">
+          {preflightLoading ? (
+            <span className="text-[11px]" style={{ color: "var(--color-text-4)" }}>
+              {t("preflight_loading")}
+            </span>
+          ) : preflight ? (
+            preflight.summary.blocking_count === 0 &&
+            preflight.summary.warning_count === 0 ? (
+              <span className="inline-flex items-center gap-1 text-[11px]" style={{ color: "oklch(0.65 0.15 145)" }}>
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                {t("preflight_all_clear")}
+              </span>
+            ) : (
+              <>
+                {preflight.summary.blocking_count > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+                    style={{
+                      background: "oklch(0.25 0.08 25 / 0.5)",
+                      border: "1px solid oklch(0.55 0.15 25 / 0.5)",
+                      color: "oklch(0.75 0.15 25)",
+                    }}
+                  >
+                    <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                    {t("preflight_blocking_count", { count: preflight.summary.blocking_count })}
+                  </span>
+                )}
+                {preflight.summary.warning_count > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium"
+                    style={{
+                      background: "oklch(0.28 0.06 75 / 0.35)",
+                      border: "1px solid oklch(0.55 0.1 75 / 0.45)",
+                      color: "oklch(0.78 0.1 80)",
+                    }}
+                  >
+                    <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                    {t("preflight_warning_count", { count: preflight.summary.warning_count })}
+                  </span>
+                )}
+                {preflight.summary.info_count > 0 && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+                    style={{
+                      background: "oklch(0.22 0.015 240 / 0.4)",
+                      border: "1px solid oklch(0.4 0.02 240 / 0.4)",
+                      color: "oklch(0.65 0.04 240)",
+                    }}
+                  >
+                    <Info className="h-3 w-3" aria-hidden="true" />
+                    {t("preflight_info_count", { count: preflight.summary.info_count })}
+                  </span>
+                )}
+              </>
+            )
+          ) : (
+            <span className="text-[11px]" style={{ color: "var(--color-text-4)" }}>
+              {t("preflight_empty")}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* 出错时不渲染空态提示，避免「没有数据」与「加载失败」同屏混淆 */}
       {!hasUnits && !error && (
         <p className="mt-2 text-[12px]" style={{ color: "var(--color-text-4)" }}>
@@ -189,6 +278,38 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
                   </span>
                 )}
                 <span className="flex-1" />
+                {preflight && (
+                  (() => {
+                    const unitIssues = [
+                      ...preflight.blocking,
+                      ...preflight.warnings,
+                    ].filter((i) => i.location === unit.unit_id || unit.shot_ids.includes(i.location));
+                    if (unitIssues.length === 0) return null;
+                    const blockCount = unitIssues.filter((i) => i.severity === "blocking").length;
+                    const warnCount = unitIssues.filter((i) => i.severity === "warning").length;
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                        title={unitIssues.map((i) => i.message).join("\n")}
+                        style={{
+                          background: blockCount > 0
+                            ? "oklch(0.25 0.08 25 / 0.5)"
+                            : "oklch(0.28 0.06 75 / 0.35)",
+                          border: blockCount > 0
+                            ? "1px solid oklch(0.55 0.15 25 / 0.5)"
+                            : "1px solid oklch(0.55 0.1 75 / 0.45)",
+                          color: blockCount > 0
+                            ? "oklch(0.75 0.15 25)"
+                            : "oklch(0.78 0.1 80)",
+                        }}
+                      >
+                        <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
+                        {blockCount > 0 && ` ${blockCount}B`}
+                        {warnCount > 0 && ` ${warnCount}W`}
+                      </span>
+                    );
+                  })()
+                )}
                 {stale && (
                   <span style={{ color: "var(--color-warning, oklch(0.75 0.15 80))" }}>
                     {t("ad_ref_stale")}
