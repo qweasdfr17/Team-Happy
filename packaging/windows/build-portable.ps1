@@ -75,6 +75,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "data") | Out-
 Write-Step "Checking for forbidden files"
 $forbidden = @(
     ".git",
+    ".venv",
     ".env",
     ".env.local",
     "frontend\node_modules",
