@@ -20,6 +20,7 @@ from lib.db.base import DEFAULT_USER_ID
 from lib.path_safety import safe_exists
 from lib.prompt_builders import append_product_fidelity_tail, append_video_negative_tail
 from lib.reference_video import assemble_shots_text, render_prompt_for_backend
+from lib.reference_video.reference_inference import infer_references_from_prompt_text
 from lib.reference_video.ad_units import (
     ad_unit_prompt_override,
     render_ad_unit_prompt,
@@ -329,7 +330,15 @@ async def execute_reference_video_task(
         )
         source_refs = [e["image"] for e in ad_entries]
     else:
-        source_refs = _resolve_unit_references(project, project_path, unit.get("references") or [])
+        # 从 prompt 文本推断 effective references，避免 unit.references 顺序与
+        # 成品提示词中"图1/图2"声明不一致导致参考图错位
+        raw_prompt = assemble_shots_text(unit.get("shots") or [])
+        inferred = infer_references_from_prompt_text(project, raw_prompt) if raw_prompt else []
+        effective_refs = inferred if inferred else (unit.get("references") or [])
+        source_refs = _resolve_unit_references(project, project_path, effective_refs)
+        # 如果是推断出来的引用，更新 unit 用于后续 prompt 渲染
+        if inferred:
+            unit = {**unit, "references": effective_refs}
 
     # 3. 构造 generator（拿到 video_backend 名字后才能做 provider 特判）
     generator = await get_media_generator(project_name, payload=payload, user_id=user_id)

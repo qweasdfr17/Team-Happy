@@ -11,6 +11,7 @@ from lib.reference_video.errors import (
     MissingReferenceError,
     ProviderUnsupportedFeatureError,
 )
+from lib.reference_video.reference_inference import infer_references_from_prompt_text
 from lib.reference_video.shot_parser import (
     assemble_shots_text,
     compute_duration_from_shots,
@@ -26,6 +27,7 @@ __all__ = [
     "ProviderUnsupportedFeatureError",
     "assemble_shots_text",
     "compute_duration_from_shots",
+    "infer_references_from_prompt_text",
     "derive_ad_reference_units",
     "merge_ad_reference_units",
     "parse_prompt",
