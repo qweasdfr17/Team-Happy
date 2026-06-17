@@ -11,10 +11,15 @@ cd /d "%~dp0"
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 
 if not defined LISTEN_PORT set "LISTEN_PORT=1241"
-set "TEAM_HAPPY_URL=http://127.0.0.1:%LISTEN_PORT%"
+if not defined LISTEN_HOST set "LISTEN_HOST=127.0.0.1"
+if not defined TEAM_HAPPY_URL set "TEAM_HAPPY_URL=http://127.0.0.1:%LISTEN_PORT%"
+if /I "%TEAM_HAPPY_LAN_MODE%"=="true" (
+    for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$ip=(Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' -and $_.IPAddress -notlike '172.17.*' } | Sort-Object InterfaceMetric | Select-Object -First 1 -ExpandProperty IPAddress); if($ip){$ip}" 2^>nul`) do set "TEAM_HAPPY_LAN_IP=%%I"
+)
 
 rem Local single-user defaults.
-set "AUTH_ENABLED=false"
+if not defined AUTH_ENABLED set "AUTH_ENABLED=false"
+if not defined AUTH_USERNAME set "AUTH_USERNAME=admin"
 if not defined ARCREEL_DATA_DIR set "ARCREEL_DATA_DIR=%ROOT%\data"
 if not defined ARCREEL_PROFILE_DIR set "ARCREEL_PROFILE_DIR=%ROOT%\agent_runtime_profile"
 set "UV_LINK_MODE=copy"
@@ -28,6 +33,8 @@ echo ============================================================ > "%START_LOG%
 echo Team-Happy launcher log >> "%START_LOG%"
 echo Root: %ROOT% >> "%START_LOG%"
 echo Started: %DATE% %TIME% >> "%START_LOG%"
+echo Listen: %LISTEN_HOST%:%LISTEN_PORT% >> "%START_LOG%"
+echo Auth enabled: %AUTH_ENABLED% >> "%START_LOG%"
 echo ============================================================ >> "%START_LOG%"
 
 echo.
@@ -145,8 +152,21 @@ echo ============================================================
 echo   Team-Happy is starting
 echo.
 echo   URL:       %TEAM_HAPPY_URL%
+if /I "%TEAM_HAPPY_LAN_MODE%"=="true" (
+    if defined TEAM_HAPPY_LAN_IP (
+        echo   LAN URL:   http://%TEAM_HAPPY_LAN_IP%:%LISTEN_PORT%
+    ) else (
+        echo   LAN URL:   http://YOUR-LAN-IP:%LISTEN_PORT%
+    )
+)
 echo   Data dir:  %ARCREEL_DATA_DIR%
-echo   Auth:      local no-login mode
+if /I "%AUTH_ENABLED%"=="false" (
+    echo   Auth:      local no-login mode
+) else (
+    echo   Auth:      login required
+    echo   Username:  %AUTH_USERNAME%
+    echo   Password:  see .env AUTH_PASSWORD if auto-generated
+)
 echo.
 echo   Keep this window open while using Team-Happy.
 echo   Close this window to stop Team-Happy.
@@ -156,7 +176,7 @@ echo.
 echo Starting uvicorn... >> "%START_LOG%"
 start "" powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$url=$env:TEAM_HAPPY_URL; $port=[int]$env:LISTEN_PORT; for($i=0; $i -lt 90; $i++){ try { $c=New-Object Net.Sockets.TcpClient('127.0.0.1',$port); $c.Close(); Start-Process $url; exit 0 } catch { Start-Sleep -Seconds 1 } }; Start-Process $url"
 
-%UV_CMD% --directory "%ROOT%" run uvicorn server.app:app --host 127.0.0.1 --port %LISTEN_PORT%
+%UV_CMD% --directory "%ROOT%" run uvicorn server.app:app --host %LISTEN_HOST% --port %LISTEN_PORT%
 
 echo.
 echo Team-Happy has stopped.

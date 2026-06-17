@@ -118,16 +118,34 @@ def merge_ad_reference_units(existing: object, derived: list[dict]) -> list[dict
     merged: list[dict] = []
     for unit in derived:
         prev = existing_by_id.get(unit["unit_id"])
-        assets = None
-        if (
+        same_identity = (
             isinstance(prev, dict)
             and prev.get("shot_ids") == unit["shot_ids"]
             and prev.get("references") == unit["references"]
-            and isinstance(prev.get("generated_assets"), dict)
-        ):
+        )
+        assets = None
+        if same_identity and isinstance(prev.get("generated_assets"), dict):
             assets = dict(prev["generated_assets"])
-        merged.append({**unit, "generated_assets": assets or GeneratedAssets().model_dump()})
+        merged_unit = {**unit, "generated_assets": assets or GeneratedAssets().model_dump()}
+        if same_identity:
+            prompt_override = prev.get("prompt_override")
+            if isinstance(prompt_override, str) and prompt_override.strip():
+                merged_unit["prompt_override"] = prompt_override
+        merged.append(merged_unit)
     return merged
+
+
+def ad_unit_prompt_override(unit: dict) -> str | None:
+    """Return an agent/user-authored prompt override for an ad reference unit.
+
+    ``reference_units`` are lightweight indexes derived from ``shots``.  When
+    the premium prompt skill writes a finished prompt for a unit, it is stored
+    here and should take precedence over the deterministic fallback prompt.
+    """
+    value = unit.get("prompt_override")
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return None
 
 
 def sync_ad_reference_units(

@@ -21,14 +21,21 @@ user-invocable: true
 开始前检查 `project.json` 的 `script_policy.mode`：
 - **preserve**：只能基于原文生成 video_prompt，原文不可改写。image_prompt 和 video_prompt 是视觉补充
 - **suggest_rewrite**：改稿建议写入 `proposals/`
-- 生成的 video_prompt 通过 `patch_episode_script` 写回，不得覆盖原始剧本文字
+- 生成的 video_prompt 不得覆盖原始剧本文字
+
+## ⚠️ 图片引用声明规则
+
+- 【图片引用声明】只负责资产绑定：`图片N：资产名`。
+- **禁止**在图片声明中写角色外观参考、场景环境参考、道具外观参考、括号说明、角色长相、服装、环境细节。
+- 资产描述只能写到后面的【场景设计】或【切片段】里。
+- 按实际 references 数量输出图片1-N，不补不存在的编号，不固定必须4张。
 
 ## 工作流
 
 1. **读取上下文**：context_pack + 当前镜头原文
 2. **查 prompt_library**：根据 style / 镜头类型取 1-3 条相关模板
-3. **逐镜头生成**：运用下方方法论
-4. **写回**：`patch_episode_script` 写入 video_prompt / image_prompt
+3. **逐镜头生成**：reference_video 优先套用 `references/9-section-template.md`，再运用下方方法论补足细节
+4. **写回**：reference_video 必须调用 `mcp__arcreel__patch_reference_video_unit_prompt` 写入红框；普通分镜字段才使用 `patch_episode_script`
 
 ---
 
@@ -38,19 +45,21 @@ user-invocable: true
 
 ---
 
-## 一、九段式结构模板
+## 一、成品提示词结构模板
 
-```
-1. 【图片引用声明】图1/图2/图3 — 角色/场景/道具参考
-2. 【场景光影基调】主光源方向/质感、暗区位置、空气介质
-3. 【基础设定】角色 + 场景 + 声音
-4. 【氛围与画质】胶片类型/色调/光线/颗粒感/画幅比例
-5. 【分镜内容】按秒拆解，含景别/运镜/构图/动作描述
-6. 【运镜补充】每个分镜独立指定摄像机/焦距/质感/运镜
-7. 【对白/配音指令】每段对白标注时机
-8. 【负面约束】明确禁止什么
-9. 【音效设计】关键音效卡点秒数
-```
+reference_video unit prompt 必须优先使用 `references/9-section-template.md` 作为输出结构。
+
+核心板块顺序：
+
+1. 【图片引用声明】图片1/图片2/图片3/图片4分别绑定角色、场景、道具或产品。
+2. 【全局视频要求】风格、帧率、画幅、无字幕、无音乐、废帧缓冲等全局规则。
+3. 【场景设计】场景、时间、光线、陈设、空间氛围。
+4. 【目标情绪】该 unit 的情绪曲线。
+5. 【片段说明】用一句话列出每个切片段的目的。
+6. 【切片段1-N】每段包含画面、运镜、对白、配音/音效。
+7. 【负面约束】统一列出禁止项。
+
+图片引用必须使用干净写法：`图片1`、`图片2`、`图片3`、`图片4`。禁止输出 `I图片1`、`!图片2`、`#图片1`、`2图片4` 等污染符号。
 
 ---
 
@@ -133,8 +142,8 @@ user-invocable: true
 2. **资产引用**：角色/场景/道具/产品 @mention + sheet 图
 3. **prompt_library**：检索 video_prompt / negative_prompt 模板
 4. **输出目标**：`video_prompt` 字段或 reference_video unit prompt
-5. **写回**：`mcp__arcreel__patch_episode_script` 写入，原文不动
+5. **写回**：reference_video 调用 `mcp__arcreel__patch_reference_video_unit_prompt`；storyboard/grid 调用 `mcp__arcreel__patch_episode_script`。原文不动
 
 ## 参考资料
 
-- **[references/9-section-template.md](references/9-section-template.md)** — 实战调试完成的九板块提示词模板（待用户补充）
+- **[references/9-section-template.md](references/9-section-template.md)** — reference_video 成品提示词主模板，必须优先使用

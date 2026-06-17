@@ -67,7 +67,9 @@ Copy-RequiredFile (Join-Path $repoRoot "alembic.ini") (Join-Path $packageRoot "a
 Copy-RequiredFile (Join-Path $repoRoot "skills-lock.json") (Join-Path $packageRoot "skills-lock.json")
 Copy-RequiredFile (Join-Path $repoRoot "CLAUDE.md") (Join-Path $packageRoot "CLAUDE.md")
 Copy-RequiredFile (Join-Path $scriptDir "start-team-happy.bat") (Join-Path $packageRoot "start-team-happy.bat")
+Copy-RequiredFile (Join-Path $scriptDir "start-team-happy-lan.bat") (Join-Path $packageRoot "start-team-happy-lan.bat")
 Copy-RequiredFile (Join-Path $scriptDir "README-Windows-Portable.md") (Join-Path $packageRoot "README-Windows-Portable.md")
+Copy-RequiredFile (Join-Path $scriptDir "README-Windows-LAN.md") (Join-Path $packageRoot "README-Windows-LAN.md")
 
 Write-Step "Creating writable data directory"
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "data") | Out-Null
@@ -95,4 +97,5 @@ foreach ($relative in $forbidden) {
 Write-Step "Portable package ready"
 Write-Host "Release directory: $packageRoot"
 Write-Host "Start command:     double-click start-team-happy.bat"
+Write-Host "LAN command:       double-click start-team-happy-lan.bat"
 Write-Host "URL:               http://127.0.0.1:1241"

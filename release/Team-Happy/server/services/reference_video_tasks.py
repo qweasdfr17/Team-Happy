@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +20,9 @@ from lib.db.base import DEFAULT_USER_ID
 from lib.path_safety import safe_exists
 from lib.prompt_builders import append_product_fidelity_tail, append_video_negative_tail
 from lib.reference_video import assemble_shots_text, render_prompt_for_backend
+from lib.reference_video.reference_inference import infer_references_from_prompt_text
 from lib.reference_video.ad_units import (
+    ad_unit_prompt_override,
     render_ad_unit_prompt,
     render_reference_legend,
     resolve_ad_unit_shots,
@@ -37,6 +40,7 @@ from server.services.generation_tasks import (
 )
 
 logger = logging.getLogger(__name__)
+_AD_MENTION_RE = re.compile(r"@\[([^\]\r\n]+)\]|@([A-Za-z0-9_\u4e00-\u9fff]+)")
 
 
 def _resolve_unit_references(
@@ -243,16 +247,37 @@ def _clamp_ad_reference_entries(
     return clamped, [warning]
 
 
-def _render_ad_unit_prompt_for_backend(shots: list[dict], entries: list[dict], *, style: object) -> str:
+def _render_ad_unit_prompt_for_backend(
+    shots: list[dict],
+    entries: list[dict],
+    *,
+    style: object,
+    unit: dict | None = None,
+) -> str:
     """ad 派生 unit 的最终 backend prompt：镜头文本 + [图N] 对照表 + 保真/反向尾词。
 
     对照表必须基于裁剪后的 ``entries`` 渲染（[图N] 与 backend 实收顺序对齐）；
     高保真指令只点名实际注入了参考的产品。空提示词防御口径同
     ``_render_unit_prompt``（提示词源是可变 script，执行期从新读取）。
     """
-    body = render_ad_unit_prompt(shots, style=style if isinstance(style, str) else None)
+    body = ad_unit_prompt_override(unit or {}) or render_ad_unit_prompt(
+        shots,
+        style=style if isinstance(style, str) else None,
+    )
     if not body.strip():
         raise ValueError("reference video unit prompt is empty: all member shots have no visual content")
+    index_by_name: dict[str, int] = {}
+    for index, entry in enumerate(entries, start=1):
+        name = entry.get("name")
+        if isinstance(name, str) and name and name not in index_by_name:
+            index_by_name[name] = index
+
+    def _replace_mention(match: re.Match[str]) -> str:
+        name = match.group(1) or match.group(2) or ""
+        index = index_by_name.get(name)
+        return f"[图{index}]" if index else match.group(0)
+
+    body = _AD_MENTION_RE.sub(_replace_mention, body)
     legend = render_reference_legend([str(e.get("label") or "") for e in entries])
     prompt = f"{body}\n\n{legend}" if legend else body
     product_names = list(dict.fromkeys(e["name"] for e in entries if e.get("kind") in ("sheet", "original")))
@@ -305,7 +330,15 @@ async def execute_reference_video_task(
         )
         source_refs = [e["image"] for e in ad_entries]
     else:
-        source_refs = _resolve_unit_references(project, project_path, unit.get("references") or [])
+        # 从 prompt 文本推断 effective references，避免 unit.references 顺序与
+        # 成品提示词中"图1/图2"声明不一致导致参考图错位
+        raw_prompt = assemble_shots_text(unit.get("shots") or [])
+        inferred = infer_references_from_prompt_text(project, raw_prompt) if raw_prompt else []
+        effective_refs = inferred if inferred else (unit.get("references") or [])
+        source_refs = _resolve_unit_references(project, project_path, effective_refs)
+        # 如果是推断出来的引用，更新 unit 用于后续 prompt 渲染
+        if inferred:
+            unit = {**unit, "references": effective_refs}
 
     # 3. 构造 generator（拿到 video_backend 名字后才能做 provider 特判）
     generator = await get_media_generator(project_name, payload=payload, user_id=user_id)
@@ -397,7 +430,12 @@ async def execute_reference_video_task(
     #    用入队快照会丢失入队后对镜头文本的编辑）；入队 payload 里的 prompt 仅作守卫点的
     #    校验记录，执行期不使用。
     if is_ad:
-        rendered_prompt = _render_ad_unit_prompt_for_backend(ad_shots or [], ad_entries, style=project.get("style"))
+        rendered_prompt = _render_ad_unit_prompt_for_backend(
+            ad_shots or [],
+            ad_entries,
+            style=project.get("style"),
+            unit=unit,
+        )
     else:
         unit_for_prompt = unit
         unit_refs = unit.get("references") or []

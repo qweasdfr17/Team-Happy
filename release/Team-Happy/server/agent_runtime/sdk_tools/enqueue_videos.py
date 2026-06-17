@@ -22,6 +22,7 @@ from lib.project_manager import ProjectManager, effective_mode
 from lib.prompt_utils import is_structured_video_prompt, video_prompt_to_yaml
 from lib.reference_video import assemble_shots_text
 from lib.reference_video.ad_units import (
+    ad_unit_prompt_override,
     render_ad_unit_prompt,
     resolve_ad_unit_shots,
     sync_ad_reference_units,
@@ -303,11 +304,12 @@ def _build_ad_reference_specs(
             continue
         try:
             shots = resolve_ad_unit_shots(script, unit)
+            prompt = ad_unit_prompt_override(unit) or render_ad_unit_prompt(shots, style=style)
             spec = TaskSpec.from_request(
                 task_type="reference_video",
                 media_type="video",
                 resource_id=unit_id,
-                prompt=render_ad_unit_prompt(shots, style=style),
+                prompt=prompt,
                 script_file=script_filename,
             )
         except ValueError as exc:
