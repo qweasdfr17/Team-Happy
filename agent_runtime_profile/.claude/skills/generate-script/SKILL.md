@@ -11,6 +11,13 @@ user-invocable: false
 是后续图像 / 视频生成的"种子"，**Prompt 质量基本决定了画面质量**——所以本 skill 是
 ArcReel 整条 pipeline 中最值得重点优化的一环。
 
+## ⚠️ 剧本母本保护
+
+- 原始 source 文本不可改写。JSON 剧本里 `novel_text` 逐字保真。
+- image_prompt / video_prompt 是**视觉补充**，不是对原文的改写。
+- 如需改编原文，走 rewrite-script skill（仅 suggest_rewrite / rewrite_approved 模式允许）。
+- 检查 project.json `script_policy.mode`：preserve 模式禁止任何原文修改。
+
 ## 前置条件
 
 1. 项目目录下存在 `project.json`（含 style / overview / characters / scenes / props）

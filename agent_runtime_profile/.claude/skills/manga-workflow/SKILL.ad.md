@@ -8,6 +8,18 @@ description: 短片/漫剧片段项目的工作流入口。当用户提到做视
 
 本项目为**短片/漫剧片段模式**（ad）：单视频、恒单集（剧本即 `scripts/episode_1.json`）、按 `target_duration` 规划镜头。产品/带货是可选分支——`products` 为空时自动按通用短片流程。**没有分集概念**——不要做分集规划、拆分或小说源文件处理。
 
+## ⚠️ 剧本母本保护（最高优先级）
+
+`project.json` 的 `script_policy.mode` 默认为 `preserve`。以下规则适用于所有 agent 操作：
+
+- **原始 source 剧本是母本**，默认不允许 AI 改写。所有修改必须经用户确认。
+- 分集规划：只能确定 source_range，**不得润色/补写/删改原文**。
+- JSON 剧本、分镜、image_prompt、video_prompt 都是**派生作品**，不替代母本。
+- 如需改写：先生成 proposal/draft 到 `proposals/` 目录，用户确认后再应用。
+- **preserve 模式**：rewrite-script skill 不得自动触发。
+- **suggest_rewrite 模式**：rewrite-script 产出写入 `proposals/`。
+- 检查 script_policy 后再执行任何涉及原文的操作。
+
 ## 工作流步骤
 
 1. **确认项目状态**：Read `project.json`，确认 `title`、`content_mode`（固定 `ad`）、`target_duration`（目标总时长，秒）、`brief`（创作诉求，可为空）、`generation_mode`（`storyboard` / `reference_video`，`grid` 不开放）、`products`（产品资产）

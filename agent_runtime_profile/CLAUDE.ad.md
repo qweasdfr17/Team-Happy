@@ -3,6 +3,14 @@
 
 本项目为**短片/漫剧片段模式**（ad）：单视频、恒单集，按 `target_duration` 规划镜头。产品/带货是可选分支——`products` 为空时自动按通用短片流程。**没有分集概念**——不要做分集规划、拆分或小说源文件处理。
 
+## ⚠️ 剧本母本保护
+
+`project.json` 的 `script_policy.mode` 默认为 `preserve`。
+- **原始 source 剧本是母本，默认不允许 AI 改写。**
+- 分集规划只能切 source_range，不得润色/补写/删改原文。
+- JSON 剧本、分镜、image_prompt、video_prompt 都是派生作品。
+- 如需改写，rewrite-script skill 仅在 suggest_rewrite / rewrite_approved 模式启用。
+
 ---
 
 ## 重要总则
