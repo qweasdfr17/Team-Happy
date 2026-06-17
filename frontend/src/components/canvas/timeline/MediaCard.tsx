@@ -46,6 +46,8 @@ interface MediaCardProps {
   uploading?: boolean;
   /** 其他上传进行中等需要互斥的场景：禁用上传入口但不显示 spinner */
   uploadDisabled?: boolean;
+  /** 生成按钮上方的动作区（如秒数调节） */
+  actions?: React.ReactNode;
 }
 
 const UPLOAD_ACCEPT: Record<MediaKind, string> = {
@@ -70,6 +72,7 @@ export function MediaCard({
   onUpload,
   uploading,
   uploadDisabled,
+  actions,
 }: MediaCardProps) {
   const { t } = useTranslation("dashboard");
 
@@ -183,6 +186,9 @@ export function MediaCard({
           </div>
         </AspectFrame>
       )}
+
+      {/* Actions slot (e.g. duration control for video) */}
+      {actions && <div className="mt-2.5">{actions}</div>}
 
       {/* Generate CTA */}
       {!hideGenerateButton && onGenerate && (

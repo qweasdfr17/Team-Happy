@@ -28,7 +28,6 @@ from lib.image_backends.gemini import GeminiImageBackend
 from lib.image_backends.kling import KlingImageBackend
 from lib.image_backends.minimax import MiniMaxImageBackend
 from lib.image_backends.openai import OpenAIImageBackend
-from lib.text_backends.gemini import GeminiTextBackend
 from lib.text_backends.openai import OpenAITextBackend
 from lib.video_backends.ark import ArkVideoBackend
 from lib.video_backends.base import VideoCapabilities
@@ -83,6 +82,8 @@ def _build_openai_chat(provider, model_id: str) -> CustomTextBackend:
 
 
 def _build_gemini_generate(provider, model_id: str) -> CustomTextBackend:
+    from lib.text_backends.gemini import GeminiTextBackend  # lazy to break cycle
+
     base_url = ensure_google_base_url(provider.base_url) or None
     delegate = GeminiTextBackend(api_key=provider.api_key, base_url=base_url, model=model_id)
     return CustomTextBackend(provider_id=provider.provider_id, delegate=delegate, model=model_id)
