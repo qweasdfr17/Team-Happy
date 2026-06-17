@@ -12,6 +12,7 @@ import {
   Package,
   Plus,
   Search,
+  GitFork,
   ShoppingBag,
 } from "lucide-react";
 import { useProjectsStore } from "@/stores/projects-store";
@@ -124,6 +125,12 @@ export function AssetSidebar({ className }: AssetSidebarProps) {
           },
         ]
       : []),
+    {
+      key: "flow-map",
+      path: "/flow-map",
+      label: t("dashboard:flow_map_title"),
+      icon: GitFork,
+    },
   ];
 
   const isNavActive = (item: NavItem): boolean => {

@@ -16,6 +16,7 @@ import { PropsPage } from "./lorebook/PropsPage";
 import { ProductsPage } from "./lorebook/ProductsPage";
 import { ReferenceVideoCanvas } from "./reference/ReferenceVideoCanvas";
 import { GridImageToVideoCanvas } from "./grid/GridImageToVideoCanvas";
+import { ProjectFlowMap } from "./flow/ProjectFlowMap";
 import { API } from "@/api";
 import { buildEntityRevisionKey } from "@/utils/project-changes";
 import { getProviderModels, getCustomProviderModels, lookupSupportedDurations } from "@/utils/provider-models";
@@ -739,6 +740,10 @@ export function StudioCanvasRouter() {
             </div>
           );
         }}
+      </Route>
+
+      <Route path="/flow-map">
+        <ProjectFlowMap />
       </Route>
     </Switch>
   );

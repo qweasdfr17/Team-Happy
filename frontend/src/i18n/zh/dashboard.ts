@@ -1294,6 +1294,8 @@ export default {
   'script_policy_rewrite': '允许 AI 改写',
   'script_policy_rewrite_desc': '（预留）用户确认后允许 AI 改写剧本',
 
+  'flow_map_title': '流程地图',
+
   // ---- 项目大厅 · Darkroom ----
   'lobby_brand_subtitle': '工作台',
   'lobby_search_placeholder': '搜索项目',

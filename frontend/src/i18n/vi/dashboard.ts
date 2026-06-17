@@ -1342,6 +1342,8 @@ export default {
   'script_policy_suggest_desc': 'AI tạo đề xuất nhưng không ghi đè; người dùng xem xét trước',
   'script_policy_rewrite': 'Cho phép AI viết lại',
   'script_policy_rewrite_desc': '(Dự phòng) AI viết lại sau khi được phê duyệt',
+
+  'flow_map_title': 'Sơ đồ quy trình',
   'workspace_nav_scenes': 'Cảnh',
   'workspace_nav_source': 'Tệp gốc',
   'workspace_notifications_title': 'Thông báo không gian làm việc',

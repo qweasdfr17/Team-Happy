@@ -1293,6 +1293,8 @@ export default {
   'script_policy_rewrite': 'Allow AI rewrites',
   'script_policy_rewrite_desc': '(Reserved) AI rewrites applied after user approval',
 
+  'flow_map_title': 'Flow Map',
+
   // ---- Projects lobby · Darkroom ----
   'lobby_brand_subtitle': 'Studio',
   'lobby_search_placeholder': 'Search projects',
