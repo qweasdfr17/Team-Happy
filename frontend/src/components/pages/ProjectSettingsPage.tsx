@@ -129,6 +129,7 @@ export function ProjectSettingsPage() {
   const [textStyle, setTextStyle] = useState<string>("");
   const [aspectRatio, setAspectRatio] = useState<string>("");
   const [generationMode, setGenerationMode] = useState<GenerationMode>("storyboard");
+  const [scriptPolicyMode, setScriptPolicyMode] = useState<"preserve"|"suggest_rewrite"|"rewrite_approved">("preserve");
   const [defaultDuration, setDefaultDuration] = useState<number | null>(null);
   const [videoResolution, setVideoResolution] = useState<string | null>(null);
   const [imageResolution, setImageResolution] = useState<string | null>(null);
@@ -150,6 +151,7 @@ export function ProjectSettingsPage() {
     defaultDuration: null as number | null,
     videoResolution: null as string | null,
     imageResolution: null as string | null,
+    scriptPolicyMode: "preserve" as string,
   });
   // 风格区独立保存，但"未保存就离开"也需被 isDirty 拦截。
   const initialStyleRef = useRef<StylePickerValue | null>(null);
@@ -227,6 +229,8 @@ export function ProjectSettingsPage() {
       setDefaultDuration(dd);
       setProjectTitle(typeof project.title === "string" ? project.title : "");
       setContentMode(typeof project.content_mode === "string" ? project.content_mode : "narration");
+      const sp = (project as Record<string, unknown>).script_policy as { mode?: string } | undefined;
+      setScriptPolicyMode(sp?.mode === "suggest_rewrite" ? "suggest_rewrite" : sp?.mode === "rewrite_approved" ? "rewrite_approved" : "preserve");
 
       // model_settings 的 key 以 effective backend（override ‖ global default）读写，
       // 与 handleSave 保持一致；legacy video_model_settings 作为旧项目兼容回退。
@@ -258,6 +262,7 @@ export function ProjectSettingsPage() {
         textScript: ts, textOverview: to, textStyle: tst,
         aspectRatio: ar, generationMode: gm, defaultDuration: dd,
         videoResolution: vRes, imageResolution: iRes,
+        scriptPolicyMode: sp?.mode === "suggest_rewrite" ? "suggest_rewrite" : sp?.mode === "rewrite_approved" ? "rewrite_approved" : "preserve",
       };
     }));
 
@@ -311,6 +316,7 @@ export function ProjectSettingsPage() {
     defaultDuration !== initialRef.current.defaultDuration ||
     videoResolution !== initialRef.current.videoResolution ||
     imageResolution !== initialRef.current.imageResolution ||
+    scriptPolicyMode !== initialRef.current.scriptPolicyMode ||
     styleIsDirty;
   /* eslint-enable react-hooks/refs */
 
@@ -415,6 +421,7 @@ export function ProjectSettingsPage() {
         // ad 项目禁写 default_duration（后端对字段出现本身返回 400），省略该键
         ...(contentMode === "ad" ? {} : { default_duration: defaultDuration }),
         model_settings: newModelSettings,
+        script_policy: { mode: scriptPolicyMode },
       });
       setModelSettings(newModelSettings);
       setNarrationVoice(trimmedVoice);
@@ -423,7 +430,7 @@ export function ProjectSettingsPage() {
         audioBackend, narrationVoice: trimmedVoice, narrationSpeed,
         textScript, textOverview, textStyle,
         aspectRatio, generationMode, defaultDuration,
-        videoResolution, imageResolution,
+        videoResolution, imageResolution, scriptPolicyMode,
       };
       useAppStore.getState().pushToast(t("saved"), "success");
     } catch (e: unknown) {
@@ -646,6 +653,35 @@ export function ProjectSettingsPage() {
                     onChange={setGenerationMode}
                     disabledModes={contentMode === "ad" ? ["grid"] : undefined}
                   />
+                </fieldset>
+              </SectionCard>
+
+              {/* Script Policy */}
+              <SectionCard kicker="Script Protection" title={t("script_policy_label")}>
+                <fieldset>
+                  <legend className="sr-only">{t("script_policy_label")}</legend>
+                  <div className="flex gap-2.5" role="radiogroup" aria-label={t("script_policy_label")}>
+                    <label className={radioCardClass(scriptPolicyMode === "preserve")}>
+                      <input type="radio" name="scriptPolicy" value="preserve" checked={scriptPolicyMode === "preserve"}
+                        onChange={() => setScriptPolicyMode("preserve")} className="sr-only" />
+                      {t("script_policy_preserve")}
+                    </label>
+                    <label className={radioCardClass(scriptPolicyMode === "suggest_rewrite")}>
+                      <input type="radio" name="scriptPolicy" value="suggest_rewrite" checked={scriptPolicyMode === "suggest_rewrite"}
+                        onChange={() => setScriptPolicyMode("suggest_rewrite")} className="sr-only" />
+                      {t("script_policy_suggest")}
+                    </label>
+                    <label className={radioCardClass(scriptPolicyMode === "rewrite_approved")}>
+                      <input type="radio" name="scriptPolicy" value="rewrite_approved" checked={scriptPolicyMode === "rewrite_approved"}
+                        onChange={() => setScriptPolicyMode("rewrite_approved")} className="sr-only" />
+                      {t("script_policy_rewrite")}
+                    </label>
+                  </div>
+                  <p className="mt-2 text-[11.5px] leading-[1.55] text-text-3">
+                    {scriptPolicyMode === "preserve" ? t("script_policy_preserve_desc")
+                      : scriptPolicyMode === "suggest_rewrite" ? t("script_policy_suggest_desc")
+                      : t("script_policy_rewrite_desc")}
+                  </p>
                 </fieldset>
               </SectionCard>
 

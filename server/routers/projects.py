@@ -99,6 +99,7 @@ class CreateProjectRequest(BaseModel):
     text_backend_overview: str | None = None
     text_backend_style: str | None = None
     model_settings: dict[str, dict[str, str | None]] | None = None
+    script_policy: dict | None = None
 
 
 class EpisodePatch(BaseModel):
@@ -143,6 +144,7 @@ class UpdateProjectRequest(BaseModel):
     clear_style_image: bool | None = None
     episodes: list[EpisodePatch] | None = None
     model_settings: dict[str, dict[str, str | None]] | None = None
+    script_policy: dict | None = None
 
 
 def _cleanup_temp_file(path: str) -> None:
@@ -531,6 +533,10 @@ async def create_project(
             # generation_mode 并入 extras 一次性写入，避免 create 后再 load-save 的额外 RMW
             if req.generation_mode is not None:
                 extras["generation_mode"] = req.generation_mode
+            # script_policy 校验后写入
+            if req.script_policy is not None:
+                from lib.script_policy import validate_script_policy
+                extras["script_policy"] = validate_script_policy(req.script_policy)
             with project_change_source("webui"):
                 project = manager.create_project_metadata(
                     project_name,
@@ -798,6 +804,11 @@ async def update_project(name: str, req: UpdateProjectRequest, _user: CurrentUse
                         logger.warning("Skipping patch for unknown episode %s", unknown_ep)
 
                     project["episodes"] = new_episodes
+
+                # script_policy
+                if "script_policy" in req.model_fields_set and req.script_policy is not None:
+                    from lib.script_policy import validate_script_policy
+                    project["script_policy"] = validate_script_policy(req.script_policy)
 
             with project_change_source("webui"):
                 # update_project 已在持锁窗口内统一应用迁移，返回升级后字段，无需二次 load_project

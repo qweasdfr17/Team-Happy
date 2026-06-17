@@ -159,6 +159,9 @@ export interface ProjectData {
     created_at: string;
     updated_at: string;
   };
+  script_policy?: {
+    mode: "preserve" | "suggest_rewrite" | "rewrite_approved";
+  };
 }
 
 /**

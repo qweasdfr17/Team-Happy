@@ -219,6 +219,7 @@ export interface CreateProjectPayload {
   text_backend_overview?: string | null;
   text_backend_style?: string | null;
   model_settings?: Record<string, { resolution?: string | null }>;
+  script_policy?: { mode: "preserve" | "suggest_rewrite" | "rewrite_approved" };
 }
 
 /** Draft metadata returned by listDrafts. */

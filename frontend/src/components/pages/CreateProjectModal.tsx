@@ -288,6 +288,7 @@ export function CreateProjectModal() {
         text_backend_overview: models.textBackendOverview || null,
         text_backend_style: models.textBackendStyle || null,
         ...(Object.keys(modelSettings).length > 0 ? { model_settings: modelSettings } : {}),
+        script_policy: { mode: "preserve" },
       });
 
       // Upload style image if in custom mode
