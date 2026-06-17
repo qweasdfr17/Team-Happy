@@ -3,10 +3,10 @@
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="frontend/public/android-chrome-maskable-512x512.png">
     <source media="(prefers-color-scheme: dark)" srcset="frontend/public/android-chrome-512x512.png">
-    <img src="frontend/public/android-chrome-maskable-512x512.png" alt="ArcReel Logo" width="128" style="border-radius: 16px;">
+    <img src="frontend/public/android-chrome-maskable-512x512.png" alt="Team-Happy Logo" width="128" style="border-radius: 16px;">
   </picture>
   <br>
-  ArcReel
+  Team-Happy
   <br>
 </h1>
 
@@ -41,7 +41,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/assets/hero-screenshot.png" alt="ArcReel 工作台" width="800">
+  <img src="docs/assets/hero-screenshot.png" alt="Team-Happy 工作台" width="800">
 </p>
 
 ---
