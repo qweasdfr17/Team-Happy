@@ -21,14 +21,21 @@ user-invocable: true
 开始前检查 `project.json` 的 `script_policy.mode`：
 - **preserve**：只能基于原文生成 video_prompt，原文不可改写。image_prompt 和 video_prompt 是视觉补充
 - **suggest_rewrite**：改稿建议写入 `proposals/`
-- 生成的 video_prompt 通过 `patch_episode_script` 写回，不得覆盖原始剧本文字
+- 生成的 video_prompt 不得覆盖原始剧本文字
+
+## ⚠️ 图片引用声明规则
+
+- 【图片引用声明】只负责资产绑定：`图片N：资产名`。
+- **禁止**在图片声明中写角色外观参考、场景环境参考、道具外观参考、括号说明、角色长相、服装、环境细节。
+- 资产描述只能写到后面的【场景设计】或【切片段】里。
+- 按实际 references 数量输出图片1-N，不补不存在的编号，不固定必须4张。
 
 ## 工作流
 
 1. **读取上下文**：context_pack + 当前镜头原文
 2. **查 prompt_library**：根据 style / 镜头类型取 1-3 条相关模板
 3. **逐镜头生成**：reference_video 优先套用 `references/9-section-template.md`，再运用下方方法论补足细节
-4. **写回**：reference_video 必须调用 `patch_reference_video_unit_prompt` 写入红框；普通分镜字段才使用 `patch_episode_script`
+4. **写回**：reference_video 必须调用 `mcp__arcreel__patch_reference_video_unit_prompt` 写入红框；普通分镜字段才使用 `patch_episode_script`
 
 ---
 
@@ -135,7 +142,7 @@ reference_video unit prompt 必须优先使用 `references/9-section-template.md
 2. **资产引用**：角色/场景/道具/产品 @mention + sheet 图
 3. **prompt_library**：检索 video_prompt / negative_prompt 模板
 4. **输出目标**：`video_prompt` 字段或 reference_video unit prompt
-5. **写回**：`mcp__arcreel__patch_episode_script` 写入，原文不动
+5. **写回**：reference_video 调用 `mcp__arcreel__patch_reference_video_unit_prompt`；storyboard/grid 调用 `mcp__arcreel__patch_episode_script`。原文不动
 
 ## 参考资料
 
