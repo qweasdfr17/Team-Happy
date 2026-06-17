@@ -43,6 +43,7 @@ class OpenAITextBackend:
         # 复用 OpenAI 兼容协议的 provider（如 dashscope）须用真实 provider 记账，
         # 否则计费查表会命中 OpenAI 的 USD 费率而非自身定价。
         self._provider_name = provider_name
+        self._base_url = base_url or ""
         # 官方端点已弃用 max_tokens（推理模型直接拒绝），用 max_completion_tokens；
         # 第三方兼容端点（自定义供应商、dashscope 等）不保证支持新参数，保守沿用 max_tokens
         self._max_tokens_param: TokenParam = (
@@ -83,6 +84,21 @@ class OpenAITextBackend:
             kwargs[self._max_tokens_param] = request.max_output_tokens
 
         if request.response_schema:
+            # 非官方 OpenAI 或 DeepSeek 兼容代理不支持原生 json_schema，
+            # 跳过原生调用直接走 Instructor 降级，避免每轮先 400 再重试
+            if _should_skip_native_schema(self._provider_name, self._base_url):
+                logger.info(
+                    "%s 不支持原生 json_schema（非官方 OpenAI / DeepSeek 兼容），直接走 Instructor 路径",
+                    self._provider_name,
+                )
+                return await _instructor_fallback(
+                    self._client,
+                    self._model,
+                    request,
+                    messages,
+                    provider=self._provider_name,
+                    token_param=self._max_tokens_param,
+                )
             schema = resolve_schema(request.response_schema)
             kwargs["response_format"] = {
                 "type": "json_schema",
@@ -178,6 +194,26 @@ _SCHEMA_ERROR_KEYWORDS = (
     "Cannot find field",
     "Invalid JSON payload",
 )
+
+
+def _should_skip_native_schema(provider_name: str, raw_base_url: object) -> bool:
+    """判断是否应跳过原生 response_format=json_schema。
+
+    以下情况直接走 Instructor 降级，避免先 400 再重试：
+    - 非官方 OpenAI provider（自定义供应商、dashscope 等）
+    - base_url 包含 deepseek.com
+    """
+    if provider_name != PROVIDER_OPENAI:
+        return True
+    # provider_name 可能是 OpenAI，但 base_url 指向 DeepSeek 中转
+    base = ""
+    if isinstance(raw_base_url, str):
+        base = raw_base_url
+    elif hasattr(raw_base_url, "__str__"):
+        base = str(raw_base_url)
+    if "deepseek.com" in base:
+        return True
+    return False
 
 
 def _is_valid_json(text: str) -> bool:

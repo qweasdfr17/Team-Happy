@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -315,15 +316,116 @@ class EpisodePlanner:
         generator = await TextGenerator.create(TextTaskType.SCRIPT, project_name)
         return cls(project_path, generator)
 
+    # ------------------------------------------------- screenplay fast-path
+
+    # 常见中文/英文分集标题模式
+    _EPISODE_TITLE_RE = re.compile(
+        r"(?:^|\n)\s*"
+        r"(?:"
+        r"第[一二三四五六七八九十百千0-9]+集"
+        r"|第\s*[0-9]+\s*集"
+        r"|EP\s*[0-9]+"
+        r"|Episode\s+[0-9]+"
+        r")"
+        r"(?:\s|$)",
+        re.MULTILINE,
+    )
+
+    def _try_screenplay_split(self, project: dict) -> PlanResult | None:
+        """screenplay 源文件含明确分集标题时，确定性切分，不调用 LLM。
+
+        返回 PlanResult 表示快路径成功；返回 None 表示无明确标记，回退 LLM。
+        """
+        source_rel, start = self._effective_start(project)
+        text = self._load_normalized_source(source_rel)
+        if start >= len(text):
+            return None
+        text = text[start:]
+
+        # 搜索所有分集标题位置
+        markers: list[tuple[int, int, str]] = []  # (start, end, title_text)
+        for m in self._EPISODE_TITLE_RE.finditer(text):
+            markers.append((m.start(), m.end(), m.group().strip()))
+        if len(markers) < 2:
+            return None  # 至少 2 个标记才说明是明确的剧本分集格式
+
+        language = _language_of(project)
+        summaries: list[EpisodePlanSummary] = []
+        committed: dict[str, Any] = {}
+
+        def _commit(p: dict) -> None:
+            fresh = backfill_episode_ledger(self.project_path, p)
+            p.clear()
+            p.update(fresh)
+            episodes_list = [e for e in (p.get("episodes") or []) if e is not None]
+            nums = [parse_episode_num(e.get("episode")) for e in episodes_list if isinstance(e, dict)]
+            next_num = max((n for n in nums if n is not None and n > 0), default=0) + 1
+
+            for idx in range(len(markers)):
+                m_start, _m_end, title = markers[idx]
+                # 正文区间：从本标记末尾到下一个标记开头（或文本末尾）
+                body_start = markers[idx][1]
+                body_end = markers[idx + 1][0] if idx + 1 < len(markers) else len(text)
+                body = text[body_start:body_end].strip()
+                abs_start = start + m_start
+                abs_end = start + body_end
+
+                num = next_num + idx
+                # hook: 取该集体末尾 ~40 字作简要钩子
+                hook = ""
+                if len(body) > 40:
+                    hook = "…" + body[-40:].strip().replace("\n", " ")
+                elif body:
+                    hook = body.replace("\n", " ")[:60]
+
+                episodes_list.append({
+                    "episode": num,
+                    "title": title,
+                    "hook": hook,
+                    "source_range": {"source_file": source_rel, "start": abs_start, "end": abs_end},
+                    "ledger_status": "planned",
+                })
+                summaries.append(EpisodePlanSummary(
+                    episode=num,
+                    title=title,
+                    hook=hook,
+                    reading_units=count_reading_units(text[m_start:body_end], language),
+                    ledger_status="planned",
+                ))
+            _sort_episodes_if_possible(episodes_list)
+            p["episodes"] = episodes_list
+            p["planning_cursor"] = {"source_file": source_rel, "offset": start + len(text)}
+            self._reconcile_derived_files(p, {source_rel: text})
+            committed["cursor"] = p["planning_cursor"]
+            committed["exhausted"] = True
+
+        self.pm.update_project(self.project_name, _commit)
+        logger.info(
+            "screenplay 快路径：从 %s 确定性切分出 %d 集（标记 %d 个），跳过 LLM 规划",
+            source_rel, len(markers), len(markers),
+        )
+        return PlanResult(
+            episodes=summaries,
+            cursor=committed["cursor"],
+            source_exhausted=bool(committed["exhausted"]),
+        )
+
     # ---------------------------------------------------------------- plan
 
     async def plan(self) -> PlanResult:
         """规划下一批集：从 planning_cursor 起的窗口产出剧情弧完整的集并提交账本。
 
-        当前源文件已无剩余有效内容时按文件名序自动推进到下一个源文件；
+        screenplay 源文件含明确分集标题（第一集/第二集…）时走确定性解析快路径，
+        不调用 LLM。当前源文件已无剩余有效内容时按文件名序自动推进到下一个源文件；
         ``source_exhausted=True`` 表示全部源文件都已规划完毕。
         """
         project = backfill_episode_ledger(self.project_path, self.pm.load_project(self.project_name))
+
+        # screenplay 快路径：源文件有明确分集标题时直接切分，不调用 LLM
+        if resolve_source_kind(project) == "screenplay":
+            fast_result = self._try_screenplay_split(project)
+            if fast_result is not None:
+                return fast_result
         start_ref = self._effective_start(project)
         source_rel, start = start_ref
         text = self._load_normalized_source(source_rel)
