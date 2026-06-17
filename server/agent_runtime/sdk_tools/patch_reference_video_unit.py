@@ -26,27 +26,26 @@ def _find_unit(script: dict, unit_id: str) -> dict:
 
 
 def _apply_prompt_to_unit(unit: dict, prompt: str, duration_seconds: int | None, refs: list | None) -> dict:
-    """将 prompt 文本解析后写入 unit.shots / unit.duration_seconds / unit.references。"""
-    # 尝试 parse：如果含 "Shot 1 (Xs):" 则拆为多 shot
-    parsed = parse_prompt(prompt)
-    if parsed is not None and len(parsed) > 0:
-        # 含 Shot header → 多 shot 模式
-        shots = []
-        total_duration = 0
-        for shot_data in parsed:
-            shots.append({"duration": shot_data.duration, "text": shot_data.text})
-            total_duration += shot_data.duration
-        unit["shots"] = shots
-        unit["duration_seconds"] = total_duration
-        unit["duration_override"] = False
+    """将 prompt 文本解析后写入 unit.shots / unit.duration_seconds / unit.references。
+
+    parse_prompt 返回 (shots, mentions, override)：
+    - override=True：纯文本模式，shots[0].text=prompt
+    - override=False：含 Shot header 的多 shot 模式
+    """
+    shots, _mentions, override = parse_prompt(prompt)
+
+    if override:
+        # 纯文本 → duration_override 模式；取传入秒数或原值或 shot 自身 duration
+        duration = duration_seconds or unit.get("duration_seconds") or (shots[0].duration if shots else 5)
+        if shots:
+            shots[0].duration = int(duration)
     else:
-        # 纯文本 → duration_override 模式
-        unit["shots"] = [{"duration": duration_seconds or unit.get("duration_seconds", 5), "text": prompt}]
-        if duration_seconds is not None:
-            unit["duration_seconds"] = duration_seconds
-        elif "duration_seconds" not in unit:
-            unit["duration_seconds"] = 5
-        unit["duration_override"] = True
+        # 含 Shot header → 不 override；duration_seconds 为各 shot 之和
+        pass
+
+    unit["shots"] = [s.model_dump() for s in shots]
+    unit["duration_seconds"] = sum(s.duration for s in shots)
+    unit["duration_override"] = override
 
     if refs is not None:
         unit["references"] = refs

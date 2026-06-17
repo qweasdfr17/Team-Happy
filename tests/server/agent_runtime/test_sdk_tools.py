@@ -275,7 +275,7 @@ async def test_generate_narration_audio_enqueues_missing_segments(fake_ctx: Tool
 
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
     assert [s.resource_id for s in captured] == ["E1S01"]
@@ -333,7 +333,7 @@ async def test_generate_narration_audio_blank_text_reported(fake_ctx: ToolContex
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
 
     # 扫描模式：空白段跳过且在输出中告警，不阻塞其余段，不算整体失败
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is not True, out
     assert [s.resource_id for s in captured] == ["E1S01"]
     assert "E1S03" in out["content"][0]["text"]
@@ -383,7 +383,7 @@ async def test_generate_narration_audio_rejects_drama_script(fake_ctx: ToolConte
         "scenes": [{"scene_id": "E1S01", "generated_assets": {}}],
     }
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
     assert "narration" in out["content"][0]["text"]
 
@@ -399,7 +399,7 @@ async def test_generate_narration_audio_rejects_reference_video_script(fake_ctx:
         "video_units": [{"unit_id": "E1U1"}],
     }
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
     assert "reference_video" in out["content"][0]["text"]
 
@@ -434,7 +434,7 @@ async def test_generate_narration_audio_skips_segment_without_id(fake_ctx: ToolC
 
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
     assert [s.resource_id for s in captured] == ["E1S01"]
@@ -458,7 +458,7 @@ async def test_generate_narration_audio_all_done(fake_ctx: ToolContext) -> None:
     script["segments"][0]["generated_assets"] = {"narration_audio": "audio/segment_E1S01.wav"}
     fake_ctx.pm.script_payload = script  # type: ignore[attr-defined]
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is not True
     assert "所有片段的旁白音频都已生成" in out["content"][0]["text"]
 
@@ -479,7 +479,7 @@ async def test_generate_narration_audio_task_failures_surface(fake_ctx: ToolCont
 
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
     tool_obj = mod.generate_narration_audio_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
     text = out["content"][0]["text"]
     assert "0 succeeded, 1 failed" in text
@@ -521,7 +521,7 @@ async def test_generate_storyboards_happy(fake_ctx: ToolContext, monkeypatch) ->
     # Strip storyboard_image to force selection
     fake_ctx.pm.script_payload["segments"][0]["generated_assets"] = {}  # type: ignore[attr-defined]
     tool_obj = generate_storyboards_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is not True
 
 
@@ -531,7 +531,7 @@ async def test_generate_storyboards_error(fake_ctx: ToolContext, monkeypatch) ->
 
     fake_ctx.pm.load_script = boom  # type: ignore[attr-defined]
     tool_obj = generate_storyboards_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -555,7 +555,7 @@ async def test_generate_grid_list_only(fake_ctx: ToolContext) -> None:
 async def test_generate_grid_wrong_mode(fake_ctx: ToolContext) -> None:
     # project doesn't have generation_mode='grid' → error
     tool_obj = generate_grid_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -583,14 +583,14 @@ async def test_generate_video_episode_happy(fake_ctx: ToolContext, monkeypatch) 
 
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
     tool_obj = generate_video_episode_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is not True
 
 
 async def test_generate_video_episode_error(fake_ctx: ToolContext) -> None:
     fake_ctx.pm.script_payload = {"content_mode": "narration", "segments": [], "episode": 1}  # type: ignore[attr-defined]
     tool_obj = generate_video_episode_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -602,13 +602,13 @@ async def test_generate_video_scene_happy(fake_ctx: ToolContext, monkeypatch) ->
 
     monkeypatch.setattr(mod, "enqueue_and_wait", fake_enqueue)
     tool_obj = generate_video_scene_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json", "scene_id": "E1S01"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "scene_id": "E1S01", "confirmed": True})
     assert out.get("is_error") is not True
 
 
 async def test_generate_video_scene_missing(fake_ctx: ToolContext) -> None:
     tool_obj = generate_video_scene_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json", "scene_id": "NO_SUCH"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "scene_id": "NO_SUCH", "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -628,7 +628,7 @@ async def test_generate_video_all_happy(fake_ctx: ToolContext, monkeypatch) -> N
 
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
     tool_obj = generate_video_all_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is not True
 
 
@@ -638,7 +638,7 @@ async def test_generate_video_all_error(fake_ctx: ToolContext) -> None:
 
     fake_ctx.pm.load_script = boom  # type: ignore[attr-defined]
     tool_obj = generate_video_all_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -668,7 +668,7 @@ async def test_generate_video_selected_happy(fake_ctx: ToolContext, monkeypatch)
 
 async def test_generate_video_selected_no_match(fake_ctx: ToolContext) -> None:
     tool_obj = generate_video_selected_tool(fake_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json", "scene_ids": ["NO_SUCH"]})
+    out = await _call(tool_obj, {"script": "episode_1.json", "scene_ids": ["NO_SUCH"], "confirmed": True})
     assert out.get("is_error") is True
 
 
@@ -1292,7 +1292,7 @@ async def test_generate_video_episode_ad_reference_derives_and_enqueues(
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
 
     tool_obj = generate_video_episode_tool(ad_reference_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
     assert [s.resource_id for s in enqueued] == ["E1U1"]
@@ -1344,7 +1344,7 @@ async def test_generate_video_episode_ad_reference_regenerates_reset_unit(
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
 
     tool_obj = generate_video_episode_tool(ad_reference_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
     # 重置后的 unit 必须重新入队，而不是凭旧文件跳过
@@ -1379,7 +1379,7 @@ async def test_generate_video_episode_ad_reference_skips_unchanged_unit_with_out
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
 
     tool_obj = generate_video_episode_tool(ad_reference_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
     assert enqueued == []
@@ -1408,6 +1408,36 @@ async def test_generate_video_all_ad_reference_falls_through_to_episode(
     monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
 
     tool_obj = generate_video_all_tool(ad_reference_ctx)
-    out = await _call(tool_obj, {"script": "episode_1.json"})
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
 
     assert out.get("is_error") is not True, out
+
+
+# ── confirmed gate ──────────────────────────────────────────────────────
+
+
+async def test_generate_video_episode_not_confirmed_returns_prompt(fake_ctx):
+    """confirmed 缺省时返回确认提示，不入队。"""
+    tool_obj = generate_video_episode_tool(fake_ctx)
+    out = await _call(tool_obj, {"script": "episode_1.json"})
+    assert out.get("is_error") is not True
+    text = out.get("content", [{}])[0].get("text", "")
+    assert "确认" in text
+
+
+async def test_generate_video_scene_not_confirmed_returns_prompt(fake_ctx):
+    """confirmed 缺省时返回确认提示。"""
+    tool_obj = generate_video_scene_tool(fake_ctx)
+    out = await _call(tool_obj, {"script": "episode_1.json", "scene_id": "E1S01"})
+    assert out.get("is_error") is not True
+    text = out.get("content", [{}])[0].get("text", "")
+    assert "确认" in text
+
+
+async def test_generate_video_selected_not_confirmed_returns_prompt(fake_ctx):
+    """confirmed 缺省时返回确认提示。"""
+    tool_obj = generate_video_selected_tool(fake_ctx)
+    out = await _call(tool_obj, {"script": "episode_1.json", "scene_ids": ["E1S01"]})
+    assert out.get("is_error") is not True
+    text = out.get("content", [{}])[0].get("text", "")
+    assert "确认" in text
