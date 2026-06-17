@@ -93,6 +93,8 @@ export interface AdReferenceUnit {
   shot_ids: string[];
   /** 继承的参考集，产品在前 */
   references: AdUnitReference[];
+  /** Agent/user-authored premium prompt used instead of the deterministic fallback. */
+  prompt_override?: string | null;
   generated_assets?: Partial<UnitGeneratedAssets> & { video_thumbnail?: string | null };
 }
 

@@ -73,6 +73,7 @@ ARCREEL_MCP_TOOL_IDS: tuple[str, ...] = (
     "get_video_capabilities",
     "plan_episodes",
     "replan_episodes",
+    "patch_reference_video_unit_prompt",
     "patch_episode_script",
     "patch_episode_meta",
     "insert_segment",

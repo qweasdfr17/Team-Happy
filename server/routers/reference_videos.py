@@ -25,6 +25,7 @@ from lib.project_manager import EpisodeScriptReboundError, ProjectManager, effec
 from lib.preflight import run_preflight
 from lib.reference_video import assemble_shots_text, parse_prompt
 from lib.reference_video.ad_units import (
+    ad_unit_prompt_override,
     render_ad_unit_prompt,
     resolve_ad_unit_shots,
     sync_ad_reference_units,
@@ -454,7 +455,10 @@ async def generate_unit(
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=_t("ref_ad_stale_index")) from exc
         style = project.get("style")
-        guard_prompt = render_ad_unit_prompt(unit_shots, style=style if isinstance(style, str) else None)
+        guard_prompt = ad_unit_prompt_override(unit) or render_ad_unit_prompt(
+            unit_shots,
+            style=style if isinstance(style, str) else None,
+        )
     else:
         unit = _find_unit(script, unit_id, _t)  # raises 404 if missing
         guard_prompt = assemble_shots_text(unit.get("shots") or [])

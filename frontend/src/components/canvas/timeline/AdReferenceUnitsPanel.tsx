@@ -304,80 +304,106 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
             return (
               <li
                 key={unit.unit_id}
-                className="flex items-center gap-3 rounded px-2 py-1.5 text-[12px]"
+                className="rounded px-2 py-1.5 text-[12px]"
                 style={{ background: "oklch(0.22 0.012 250 / 0.5)" }}
               >
-                <span className="font-mono font-medium" style={{ color: "var(--color-text-2)" }}>
-                  {unit.unit_id}
-                </span>
-                <span style={{ color: "var(--color-text-3)" }}>{shotRangeLabel(unit.shot_ids)}</span>
-                <span style={{ color: "var(--color-text-4)" }}>{duration}s</span>
-                {unit.references.length > 0 && (
-                  <span className="truncate" style={{ color: "var(--color-text-4)" }}>
-                    {unit.references.map((r) => r.name).join(" / ")}
+                <div className="flex items-center gap-3">
+                  <span className="font-mono font-medium" style={{ color: "var(--color-text-2)" }}>
+                    {unit.unit_id}
                   </span>
-                )}
-                <span className="flex-1" />
-                {preflight && (
-                  (() => {
-                    const unitIssues = [
-                      ...preflight.blocking,
-                      ...preflight.warnings,
-                    ].filter((i) => i.location === unit.unit_id || unit.shot_ids.includes(i.location));
-                    if (unitIssues.length === 0) return null;
-                    const blockCount = unitIssues.filter((i) => i.severity === "blocking").length;
-                    const warnCount = unitIssues.filter((i) => i.severity === "warning").length;
-                    return (
-                      <span
-                        className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
-                        title={unitIssues.map((i) => i.message).join("\n")}
-                        style={{
-                          background: blockCount > 0
-                            ? "oklch(0.25 0.08 25 / 0.5)"
-                            : "oklch(0.28 0.06 75 / 0.35)",
-                          border: blockCount > 0
-                            ? "1px solid oklch(0.55 0.15 25 / 0.5)"
-                            : "1px solid oklch(0.55 0.1 75 / 0.45)",
-                          color: blockCount > 0
-                            ? "oklch(0.75 0.15 25)"
-                            : "oklch(0.78 0.1 80)",
-                        }}
-                      >
-                        <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
-                        {blockCount > 0 && ` ${blockCount}B`}
-                        {warnCount > 0 && ` ${warnCount}W`}
-                      </span>
-                    );
-                  })()
-                )}
-                {stale && (
-                  <span style={{ color: "var(--color-warning, oklch(0.75 0.15 80))" }}>
-                    {t("ad_ref_stale")}
-                  </span>
-                )}
-                {videoUrl && (
-                  <a
-                    href={videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline"
-                    style={{ color: "var(--color-accent)" }}
+                  <span style={{ color: "var(--color-text-3)" }}>{shotRangeLabel(unit.shot_ids)}</span>
+                  <span style={{ color: "var(--color-text-4)" }}>{duration}s</span>
+                  {unit.references.length > 0 && (
+                    <span className="truncate" style={{ color: "var(--color-text-4)" }}>
+                      {unit.references.map((r) => r.name).join(" / ")}
+                    </span>
+                  )}
+                  {unit.prompt_override && (
+                    <span
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: "oklch(0.28 0.08 155 / 0.35)",
+                        border: "1px solid oklch(0.48 0.11 155 / 0.45)",
+                        color: "oklch(0.76 0.10 155)",
+                      }}
+                    >
+                      {t("skill_content_label")}
+                    </span>
+                  )}
+                  <span className="flex-1" />
+                  {preflight && (
+                    (() => {
+                      const unitIssues = [
+                        ...preflight.blocking,
+                        ...preflight.warnings,
+                      ].filter((i) => i.location === unit.unit_id || unit.shot_ids.includes(i.location));
+                      if (unitIssues.length === 0) return null;
+                      const blockCount = unitIssues.filter((i) => i.severity === "blocking").length;
+                      const warnCount = unitIssues.filter((i) => i.severity === "warning").length;
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+                          title={unitIssues.map((i) => i.message).join("\n")}
+                          style={{
+                            background: blockCount > 0
+                              ? "oklch(0.25 0.08 25 / 0.5)"
+                              : "oklch(0.28 0.06 75 / 0.35)",
+                            border: blockCount > 0
+                              ? "1px solid oklch(0.55 0.15 25 / 0.5)"
+                              : "1px solid oklch(0.55 0.1 75 / 0.45)",
+                            color: blockCount > 0
+                              ? "oklch(0.75 0.15 25)"
+                              : "oklch(0.78 0.1 80)",
+                          }}
+                        >
+                          <AlertTriangle className="h-2.5 w-2.5" aria-hidden="true" />
+                          {blockCount > 0 && ` ${blockCount}B`}
+                          {warnCount > 0 && ` ${warnCount}W`}
+                        </span>
+                      );
+                    })()
+                  )}
+                  {stale && (
+                    <span style={{ color: "var(--color-warning, oklch(0.75 0.15 80))" }}>
+                      {t("ad_ref_stale")}
+                    </span>
+                  )}
+                  {videoUrl && (
+                    <a
+                      href={videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline"
+                      style={{ color: "var(--color-accent)" }}
+                    >
+                      {t("ad_ref_view_video")}
+                    </a>
+                  )}
+                  <button
+                    type="button"
+                    className="sv-navbtn inline-flex items-center gap-1"
+                    disabled={busy || stale || deriving}
+                    onClick={() => {
+                      setError(null);
+                      void generateUnit(unit.unit_id);
+                    }}
                   >
-                    {t("ad_ref_view_video")}
-                  </a>
+                    <Sparkles className="h-3 w-3" aria-hidden="true" />
+                    <span>{busy ? t("ad_ref_generating") : t("ad_ref_generate_unit")}</span>
+                  </button>
+                </div>
+                {unit.prompt_override && (
+                  <pre
+                    className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded border px-2.5 py-2 text-[11px] leading-relaxed"
+                    style={{
+                      borderColor: "var(--color-hairline-soft)",
+                      background: "oklch(0.17 0.012 250 / 0.8)",
+                      color: "var(--color-text-3)",
+                    }}
+                  >
+                    {unit.prompt_override}
+                  </pre>
                 )}
-                <button
-                  type="button"
-                  className="sv-navbtn inline-flex items-center gap-1"
-                  disabled={busy || stale || deriving}
-                  onClick={() => {
-                    setError(null);
-                    void generateUnit(unit.unit_id);
-                  }}
-                >
-                  <Sparkles className="h-3 w-3" aria-hidden="true" />
-                  <span>{busy ? t("ad_ref_generating") : t("ad_ref_generate_unit")}</span>
-                </button>
               </li>
             );
           })}

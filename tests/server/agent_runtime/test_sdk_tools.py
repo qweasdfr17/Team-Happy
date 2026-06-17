@@ -1303,6 +1303,81 @@ async def test_generate_video_episode_ad_reference_derives_and_enqueues(
     assert script["reference_units"][0]["references"][0] == {"type": "product", "name": "保温杯"}
 
 
+async def test_patch_reference_video_unit_prompt_writes_ad_prompt_override(
+    ad_reference_ctx: ToolContext,
+) -> None:
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = ad_reference_ctx.pm
+    product_name = pm.script_payload["shots"][0]["products_in_shot"][0]  # type: ignore[attr-defined]
+    pm.script_payload["reference_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shot_ids": ["E1S1", "E1S2"],
+            "references": [{"type": "product", "name": product_name}],
+            "generated_assets": {"status": "pending"},
+        }
+    ]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(ad_reference_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            "prompt": "premium prompt from skill",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    unit = pm.script_payload["reference_units"][0]  # type: ignore[attr-defined]
+    assert unit["prompt_override"] == "premium prompt from skill"
+    assert "shots" not in unit
+
+
+async def test_generate_video_episode_ad_reference_uses_prompt_override(
+    ad_reference_ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from server.agent_runtime.sdk_tools import enqueue_videos as mod
+
+    pm = ad_reference_ctx.pm
+    product_name = pm.script_payload["shots"][0]["products_in_shot"][0]  # type: ignore[attr-defined]
+    pm.script_payload["reference_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shot_ids": ["E1S1", "E1S2"],
+            "references": [{"type": "product", "name": product_name}],
+            "generated_assets": {"status": "pending"},
+            "prompt_override": "premium prompt from skill",
+        }
+    ]
+    enqueued: list[Any] = []
+
+    async def fake_batch(*, project_name: str, specs: list[Any], on_success=None, on_failure=None):
+        from lib.generation_queue_client import BatchTaskResult
+
+        enqueued.extend(specs)
+        for spec in specs:
+            if on_success:
+                on_success(
+                    BatchTaskResult(
+                        resource_id=spec.resource_id,
+                        task_id="t1",
+                        status="succeeded",
+                        result={"file_path": f"reference_videos/{spec.resource_id}.mp4"},
+                    )
+                )
+        return [], []
+
+    monkeypatch.setattr(mod, "batch_enqueue_and_wait", fake_batch)
+
+    tool_obj = generate_video_episode_tool(ad_reference_ctx)
+    out = await _call(tool_obj, {"script": "episode_1.json", "confirmed": True})
+
+    assert out.get("is_error") is not True, out
+    assert [s.payload["prompt"] for s in enqueued] == ["premium prompt from skill"]
+
+
 async def test_generate_video_episode_ad_reference_regenerates_reset_unit(
     ad_reference_ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

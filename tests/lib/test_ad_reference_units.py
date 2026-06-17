@@ -7,6 +7,7 @@
 import pytest
 
 from lib.reference_video.ad_units import (
+    ad_unit_prompt_override,
     derive_ad_reference_units,
     render_ad_unit_prompt,
     resolve_ad_unit_shots,
@@ -215,6 +216,34 @@ class TestSyncPersistence:
 
         assert units[0]["references"] == [{"type": "product", "name": "按摩仪"}]
         assert units[0]["generated_assets"].get("video_clip") is None
+
+
+    def test_resync_with_unchanged_unit_preserves_prompt_override(self):
+        script = {"episode": 1, "shots": [_shot("E1S1"), _shot("E1S2")]}
+        sync_ad_reference_units(script, episode=1)
+        script["reference_units"][0]["prompt_override"] = "premium prompt from skill"
+
+        units = sync_ad_reference_units(script, episode=1)
+
+        assert units[0]["prompt_override"] == "premium prompt from skill"
+
+    def test_resync_after_shot_change_resets_prompt_override(self):
+        script = {"episode": 1, "shots": [_shot("E1S1"), _shot("E1S2")]}
+        sync_ad_reference_units(script, episode=1)
+        script["reference_units"][0]["prompt_override"] = "old premium prompt"
+        script["shots"].append(_shot("E1S3"))
+
+        units = sync_ad_reference_units(script, episode=1)
+
+        assert "prompt_override" not in units[0]
+
+
+class TestPromptOverride:
+    def test_returns_trimmed_non_empty_override(self):
+        assert ad_unit_prompt_override({"prompt_override": "  premium prompt  "}) == "premium prompt"
+
+    def test_blank_override_is_ignored(self):
+        assert ad_unit_prompt_override({"prompt_override": "   "}) is None
 
 
 class TestResolveUnitShots:

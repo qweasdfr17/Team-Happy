@@ -1,5 +1,6 @@
 from lib.reference_video.ad_units import (
     AD_UNIT_MAX_SHOTS,
+    ad_unit_prompt_override,
     derive_ad_reference_units,
     merge_ad_reference_units,
     render_ad_unit_prompt,
@@ -20,6 +21,7 @@ from lib.reference_video.shot_parser import (
 
 __all__ = [
     "AD_UNIT_MAX_SHOTS",
+    "ad_unit_prompt_override",
     "MissingReferenceError",
     "ProviderUnsupportedFeatureError",
     "assemble_shots_text",

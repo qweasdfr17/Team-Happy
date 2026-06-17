@@ -14,14 +14,20 @@ from lib.reference_video import parse_prompt
 from server.agent_runtime.sdk_tools._context import ToolContext, tool_error, validate_script_filename
 
 
-def _find_unit(script: dict, unit_id: str) -> dict:
-    """在 script["video_units"] 中查找 unit。"""
-    units = script.get("video_units")
-    if not isinstance(units, list):
-        raise ValueError("video_units 不存在或不是数组")
-    for u in units:
-        if isinstance(u, dict) and u.get("unit_id") == unit_id:
-            return u
+def _find_unit(script: dict, unit_id: str) -> tuple[dict, str]:
+    """Find a reference-video unit.
+
+    narration/drama reference-video scripts store full units in ``video_units``.
+    ad reference-video scripts store lightweight derived indexes in
+    ``reference_units``.  The WebUI/generator must support both.
+    """
+    for key in ("video_units", "reference_units"):
+        units = script.get(key)
+        if not isinstance(units, list):
+            continue
+        for u in units:
+            if isinstance(u, dict) and u.get("unit_id") == unit_id:
+                return u, key
     raise ValueError(f"未找到 unit: {unit_id}")
 
 
@@ -50,6 +56,22 @@ def _apply_prompt_to_unit(unit: dict, prompt: str, duration_seconds: int | None,
     if refs is not None:
         unit["references"] = refs
 
+    return unit
+
+
+def _apply_prompt_to_ad_reference_unit(unit: dict, prompt: str, refs: list | None) -> dict:
+    """Persist a finished premium prompt for an ad reference unit.
+
+    ad ``reference_units`` do not own shot content; they only point at
+    ``shots[]``.  Store the agent-authored prompt as an override so generation
+    can prefer it without rewriting the mother script or shot fields.
+    """
+    cleaned = prompt.strip()
+    if not cleaned:
+        raise ValueError("prompt 不能为空")
+    unit["prompt_override"] = cleaned
+    if refs is not None:
+        unit["references"] = refs
     return unit
 
 
@@ -89,8 +111,11 @@ def patch_reference_video_unit_prompt_tool(ctx: ToolContext):
             validate_script_filename(script_file)
 
             with ctx.pm.locked_script(ctx.project_name, script_file) as script:
-                unit = _find_unit(script, unit_id)
-                _apply_prompt_to_unit(unit, prompt, duration_seconds, refs)
+                unit, unit_kind = _find_unit(script, unit_id)
+                if unit_kind == "reference_units":
+                    _apply_prompt_to_ad_reference_unit(unit, prompt, refs)
+                else:
+                    _apply_prompt_to_unit(unit, prompt, duration_seconds, refs)
 
             return {
                 "content": [{

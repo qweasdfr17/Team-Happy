@@ -20,6 +20,7 @@ from lib.path_safety import safe_exists
 from lib.prompt_builders import append_product_fidelity_tail, append_video_negative_tail
 from lib.reference_video import assemble_shots_text, render_prompt_for_backend
 from lib.reference_video.ad_units import (
+    ad_unit_prompt_override,
     render_ad_unit_prompt,
     render_reference_legend,
     resolve_ad_unit_shots,
@@ -243,14 +244,23 @@ def _clamp_ad_reference_entries(
     return clamped, [warning]
 
 
-def _render_ad_unit_prompt_for_backend(shots: list[dict], entries: list[dict], *, style: object) -> str:
+def _render_ad_unit_prompt_for_backend(
+    shots: list[dict],
+    entries: list[dict],
+    *,
+    style: object,
+    unit: dict | None = None,
+) -> str:
     """ad 派生 unit 的最终 backend prompt：镜头文本 + [图N] 对照表 + 保真/反向尾词。
 
     对照表必须基于裁剪后的 ``entries`` 渲染（[图N] 与 backend 实收顺序对齐）；
     高保真指令只点名实际注入了参考的产品。空提示词防御口径同
     ``_render_unit_prompt``（提示词源是可变 script，执行期从新读取）。
     """
-    body = render_ad_unit_prompt(shots, style=style if isinstance(style, str) else None)
+    body = ad_unit_prompt_override(unit or {}) or render_ad_unit_prompt(
+        shots,
+        style=style if isinstance(style, str) else None,
+    )
     if not body.strip():
         raise ValueError("reference video unit prompt is empty: all member shots have no visual content")
     legend = render_reference_legend([str(e.get("label") or "") for e in entries])
@@ -397,7 +407,12 @@ async def execute_reference_video_task(
     #    用入队快照会丢失入队后对镜头文本的编辑）；入队 payload 里的 prompt 仅作守卫点的
     #    校验记录，执行期不使用。
     if is_ad:
-        rendered_prompt = _render_ad_unit_prompt_for_backend(ad_shots or [], ad_entries, style=project.get("style"))
+        rendered_prompt = _render_ad_unit_prompt_for_backend(
+            ad_shots or [],
+            ad_entries,
+            style=project.get("style"),
+            unit=unit,
+        )
     else:
         unit_for_prompt = unit
         unit_refs = unit.get("references") or []
