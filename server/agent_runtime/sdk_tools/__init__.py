@@ -36,6 +36,7 @@ from server.agent_runtime.sdk_tools.episode_planning import (
 )
 from server.agent_runtime.sdk_tools.patch_episode_meta import patch_episode_meta_tool
 from server.agent_runtime.sdk_tools.patch_project import patch_project_tool
+from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
 from server.agent_runtime.sdk_tools.patch_script import (
     insert_segment_tool,
     patch_episode_script_tool,
@@ -99,6 +100,7 @@ def build_arcreel_mcp_server(*, project_name: str, projects_root: Path) -> Any:
             generate_narration_audio_tool(ctx),
             generate_episode_script_tool(ctx),
             normalize_drama_script_tool(ctx),
+            patch_reference_video_unit_prompt_tool(ctx),
             get_video_capabilities_tool(ctx),
             plan_episodes_tool(ctx),
             replan_episodes_tool(ctx),

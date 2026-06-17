@@ -8,6 +8,14 @@ user-invocable: true
 
 本 skill 是正式 video_prompt 生成器，集成完整的视频提示词写作方法论。
 
+## ⚠️ 最高优先级：只写提示词，不生成视频
+
+- 本 skill 只生成/更新 video prompt，**不生成视频**。
+- reference_video 模式下，必须把结果写入 video_unit prompt（WebUI 红框）。
+- 必须调用 `mcp__arcreel__patch_reference_video_unit_prompt` 写入。
+- **禁止**调用 `generate_video_*` 系列工具。
+- 完成后回复用户：提示词已写入红框，请在页面审核，确认后再生成视频。
+
 ## ⚠️ script_policy 约束
 
 开始前检查 `project.json` 的 `script_policy.mode`：

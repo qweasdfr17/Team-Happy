@@ -480,11 +480,18 @@ def generate_video_episode_tool(ctx: ToolContext):
                     "description": "剧本文件名（如 episode_1.json），必须是纯文件名，禁止任何路径分隔符",
                 },
                 "resume": {"type": "boolean", "description": "是否从上次中断处继续"},
+                "confirmed": {"type": "boolean", "description": "视频生成是高成本操作，必须用户明确确认后才执行。缺省为 false，返回确认提示不入队"},
             },
             "required": ["script"],
         },
     )
     async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        if not bool(args.get("confirmed")):
+            return {"content": [{"type": "text", "text": (
+                "⚠️ 视频生成是高成本操作，需要你明确确认。\\n"
+                "请回复「确认生成视频」「开始生成视频」「我同意生成」或「执行生视频」后重试。"
+            )}]}
+
         log: list[str] = []
         try:
             script_filename = validate_script_filename(args["script"])
@@ -568,11 +575,18 @@ def generate_video_scene_tool(ctx: ToolContext):
                     "description": "剧本文件名（如 episode_1.json），必须是纯文件名，禁止任何路径分隔符",
                 },
                 "scene_id": {"type": "string", "description": "场景或片段 ID"},
+                "confirmed": {"type": "boolean", "description": "视频生成是高成本操作，必须用户明确确认后才执行。缺省为 false，返回确认提示不入队"},
             },
             "required": ["script", "scene_id"],
         },
     )
     async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        if not bool(args.get("confirmed")):
+            return {"content": [{"type": "text", "text": (
+                "⚠️ 视频生成是高成本操作，需要你明确确认。\\n"
+                "请回复「确认生成视频」「开始生成视频」「我同意生成」或「执行生视频」后重试。"
+            )}]}
+
         try:
             script_filename = validate_script_filename(args["script"])
             scene_id = args["scene_id"]
@@ -662,6 +676,12 @@ def generate_video_all_tool(ctx: ToolContext):
         },
     )
     async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        if not bool(args.get("confirmed")):
+            return {"content": [{"type": "text", "text": (
+                "⚠️ 视频生成是高成本操作，需要你明确确认。\\n"
+                "请回复「确认生成视频」「开始生成视频」「我同意生成」或「执行生视频」后重试。"
+            )}]}
+
         log: list[str] = []
         try:
             script_filename = validate_script_filename(args["script"])
@@ -733,6 +753,12 @@ def generate_video_selected_tool(ctx: ToolContext):
         },
     )
     async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        if not bool(args.get("confirmed")):
+            return {"content": [{"type": "text", "text": (
+                "⚠️ 视频生成是高成本操作，需要你明确确认。\\n"
+                "请回复「确认生成视频」「开始生成视频」「我同意生成」或「执行生视频」后重试。"
+            )}]}
+
         log: list[str] = []
         try:
             script_filename = validate_script_filename(args["script"])

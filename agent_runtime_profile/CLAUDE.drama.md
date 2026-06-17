@@ -1,6 +1,12 @@
 # AI 视频生成工作空间
 <!-- mode: drama -->
 
+## ⚠️ 禁止自动生成视频
+
+- 任何视频生成入队前必须用户二次确认（`confirmed=true`）。
+- Agent 不得把"生成提示词"理解成"生成视频"。
+- `generate_video_*` 缺省 `confirmed=false` → 返回确认提示，不入队。
+
 ---
 
 ## 重要总则

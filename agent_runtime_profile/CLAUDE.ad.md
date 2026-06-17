@@ -11,6 +11,13 @@
 - JSON 剧本、分镜、image_prompt、video_prompt 都是派生作品。
 - 如需改写，rewrite-script skill 仅在 suggest_rewrite / rewrite_approved 模式启用。
 
+## ⚠️ 禁止自动生成视频
+
+- 任何视频生成入队前必须用户二次确认（`confirmed=true`）。
+- Agent 不得把"生成提示词"理解成"生成视频"。
+- reference_video 流程：先写 prompt 到 unit 红框（`patch_reference_video_unit_prompt`），用户审核后再由用户点击 UI 或明确确认生成。
+- `generate_video_*` 缺省 `confirmed=false` → 返回确认提示，不入队。
+
 ---
 
 ## 重要总则
