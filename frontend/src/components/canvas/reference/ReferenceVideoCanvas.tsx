@@ -13,6 +13,7 @@ import {
 import { UnitList } from "./UnitList";
 import { UnitRail } from "./UnitRail";
 import { UnitPreviewPanel } from "./UnitPreviewPanel";
+import { DurationPill } from "../timeline/DurationPill";
 import { ReferenceVideoCard, unitPromptText } from "./ReferenceVideoCard";
 import { ReferencePanel } from "./ReferencePanel";
 import { EpisodeHeader } from "./EpisodeHeader";
@@ -284,6 +285,33 @@ export function ReferenceVideoCanvas({
   }, [selected, drafts, projectName, episode]);
 
   const isDirty = !!(selected && dirtyMap[selected.unit_id]);
+
+  // 单 shot unit：秒数修改同步到 prompt 文本中的 Shot header
+  const handleDurationChange = useCallback(
+    (_segmentId: string, _fieldOrPatch: string | Record<string, unknown>, value?: unknown) => {
+      if (!selected || selected.shots.length !== 1) return;
+      const newSec = typeof value === "number" ? value : parseInt(String(value), 10);
+      if (!Number.isFinite(newSec) || newSec < 1) return;
+      const currentShot = selected.shots[0];
+      const oldSec = currentShot.duration;
+      if (newSec === oldSec) return;
+      const newText = currentText.replace(
+        new RegExp(`Shot 1 \\(${oldSec}s\\)`),
+        `Shot 1 (${newSec}s)`,
+      );
+      if (newText !== currentText) {
+        handlePromptChange(newText);
+      }
+    },
+    [selected, currentText, handlePromptChange],
+  );
+
+  // 参考生视频单镜头秒数范围 1-15
+  const refDurationOptions = useMemo(() => {
+    const opts: number[] = [];
+    for (let i = 1; i <= 15; i++) opts.push(i);
+    return opts;
+  }, []);
 
   const hasAnyDraft = Object.keys(drafts).length > 0;
 
@@ -605,10 +633,19 @@ export function ReferenceVideoCanvas({
                     >
                       {selected.unit_id}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded border border-[var(--color-hairline-soft)] bg-[oklch(0.22_0.011_265_/_0.6)] px-2 py-0.5 text-[11.5px] text-[var(--color-text-2)]">
-                      <Clock className="h-3 w-3" aria-hidden="true" />
-                      <span className="font-mono tabular-nums">{selected.duration_seconds}s</span>
-                    </span>
+                    {selected.shots.length === 1 ? (
+                      <DurationPill
+                        seconds={selected.duration_seconds}
+                        segmentId={selected.unit_id}
+                        durationOptions={refDurationOptions}
+                        onUpdatePrompt={handleDurationChange}
+                      />
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded border border-[var(--color-hairline-soft)] bg-[oklch(0.22_0.011_265_/_0.6)] px-2 py-0.5 text-[11.5px] text-[var(--color-text-2)]">
+                        <Clock className="h-3 w-3" aria-hidden="true" />
+                        <span className="font-mono tabular-nums">{selected.duration_seconds}s</span>
+                      </span>
+                    )}
                     <span className="inline-flex items-center gap-1 rounded border border-[var(--color-hairline-soft)] bg-[oklch(0.22_0.011_265_/_0.6)] px-2 py-0.5 text-[11.5px] text-[var(--color-text-2)]">
                       <Scissors className="h-3 w-3" aria-hidden="true" />
                       <span className="font-mono tabular-nums">
