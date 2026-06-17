@@ -33,6 +33,7 @@ from lib.asset_fingerprints import compute_asset_fingerprints
 from lib.config.resolver import ConfigResolver
 from lib.context_pack import build_context_pack
 from lib.db import async_session_factory
+from lib.prompt_library import load_prompt_library, resolve_prompts
 from lib.i18n import Translator
 from lib.profile_manifest import ContentMode
 from lib.project_change_hints import project_change_source
@@ -1421,4 +1422,58 @@ async def regenerate_context_pack(name: str, _user: CurrentUser, _t: Translator)
         raise
     except Exception:
         logger.exception("生成 context pack 失败")
+        raise HTTPException(status_code=500, detail=_t("internal_server_error"))
+
+
+# ── Prompt Library ──────────────────────────────────────────────────────
+
+
+@router.get("/prompt-library")
+async def get_prompt_library(
+    _user: CurrentUser,
+    _t: Translator,
+    category: str = "",
+    tags: str = "",
+    query: str = "",
+    limit: int = 3,
+):
+    """查询全局内置提示词库（不含项目自定义）。
+
+    按 category / tags / query 检索，返回最相关模板。
+    """
+    try:
+        lib = load_prompt_library()  # 仅 builtins
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+        items = resolve_prompts(lib, category=category, tags=tag_list, query=query, limit=limit)
+        return {"items": items}
+    except Exception:
+        logger.exception("查询提示词库失败")
+        raise HTTPException(status_code=500, detail=_t("internal_server_error"))
+
+
+@router.get("/projects/{name}/prompt-library")
+async def get_project_prompt_library(
+    name: str,
+    _user: CurrentUser,
+    _t: Translator,
+    category: str = "",
+    tags: str = "",
+    query: str = "",
+    limit: int = 3,
+):
+    """查询项目级提示词库（builtins + 项目 context/prompt_library/*.json）。
+
+    自定义模板 id 与 builtin 冲突时，自定义覆盖 builtin。
+    """
+    try:
+        pm = get_project_manager()
+        project_path = pm.get_project_path(name)
+        lib = load_prompt_library(project_path)
+        tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+        items = resolve_prompts(lib, category=category, tags=tag_list, query=query, limit=limit)
+        return {"items": items}
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=_t("project_not_found", name=name))
+    except Exception:
+        logger.exception("查询项目提示词库失败")
         raise HTTPException(status_code=500, detail=_t("internal_server_error"))

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "prop_manga_001",
+    "category": "prop_asset",
+    "title": "漫剧道具设计基础模板",
+    "tags": ["漫剧", "道具", "基础"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["name", "description"],
+    "content": "生成道具「{name}」的标准设计图：{description}。三视图水平排列于纯净浅灰背景——左侧正面全视图、中间45°侧视图体现立体感、右侧关键细节特写。外观结构完整，焦点清晰。",
+    "negative": "结构缺失，视图间比例不一致，细节模糊，背景杂乱",
+    "notes": "基础模板，适合大多数道具。调用方需先填入 {name} 和 {description}。",
+    "source": "builtin",
+    "priority": 80
+  }
+]

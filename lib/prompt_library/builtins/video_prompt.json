@@ -1,0 +1,67 @@
+[
+  {
+    "id": "video_reference_multishot_manga_001",
+    "category": "video_prompt",
+    "title": "参考图驱动漫剧多切片视频提示词",
+    "tags": ["漫剧", "参考图", "多切片", "运镜", "对白", "60fps", "竖屏"],
+    "language": "zh",
+    "format_type": "reference_video_multishot",
+    "variables": [
+      "image_reference_map",
+      "global_style",
+      "scene_design",
+      "target_emotion",
+      "shot_slices",
+      "camera_motion",
+      "dialogue",
+      "negative_rules"
+    ],
+    "content": "图片引用声明：\n{image_reference_map}\n\n全局视频要求：\n{global_style}\n\n场景设计：\n{scene_design}\n\n目标情绪标签：{target_emotion}\n\n切片段逐段描述如下：\n\n{shot_slices}\n\n运镜补充指令：{camera_motion}\n\n对白/配音指令：{dialogue}\n\n负面约束：{negative_rules}",
+    "negative": "禁止出现字幕、文字、水印、BGM、Logo；禁止跳帧或帧率不稳；禁止人物动作僵硬、表情呆板；禁止口型与语音不同步；禁止场景风格与参考图不符；禁止镜头无故黑屏或白场",
+    "notes": "适合 reference_video 路径下 3-4 个切片的视频生成。调用方需逐项填入 image_reference_map（图1/图2/图3对应角色/场景/道具）、global_style、scene_design、target_emotion、shot_slices（逐段画面动作+落点）、camera_motion、dialogue（每段对白/配音）、negative_rules。format_type=reference_video_multishot 表示这是多切片结构化模板。",
+    "source": "builtin",
+    "priority": 95
+  },
+  {
+    "id": "video_manga_motion_001",
+    "category": "video_prompt",
+    "title": "漫剧镜头运动基础模板",
+    "tags": ["漫剧", "竖屏", "角色动作"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["action", "camera_motion"],
+    "content": "{action} 运镜：{camera_motion}。镜头运动应平滑自然，节奏与角色情绪同步。",
+    "negative": "禁止出现：BGM、文字字幕、水印。镜头晃动剧烈，跳帧，画面撕裂",
+    "notes": "基础镜头运动模板。调用方需填入 {action} 和 {camera_motion}。",
+    "source": "builtin",
+    "priority": 80
+  },
+  {
+    "id": "video_manga_dialogue_001",
+    "category": "video_prompt",
+    "title": "漫剧对话镜头模板",
+    "tags": ["漫剧", "对话", "中景"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["speaker1", "speaker2"],
+    "content": "中景双人对话镜头：{speaker1} 与 {speaker2} 面对面。镜头在两人间轻微推拉，根据说话人切换焦点。口型与台词同步，表情传递情绪。",
+    "negative": "禁止出现：BGM、文字字幕、水印。角色面瘫，口型与声音不同步，镜头跳跃",
+    "notes": "适合双人对话镜头。调用方需填入 {speaker1} 和 {speaker2}。",
+    "source": "builtin",
+    "priority": 60
+  },
+  {
+    "id": "video_realistic_action_001",
+    "category": "video_prompt",
+    "title": "写实动作镜头模板",
+    "tags": ["写实", "动作", "手持"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["action", "camera_motion"],
+    "content": "写实风格手持镜头：{action}。轻微的手持晃动感增加临场感，焦点紧随主体。运镜：{camera_motion}。",
+    "negative": "禁止出现：BGM、文字字幕、水印。过度平滑的CG感，镜头飘忽失焦",
+    "notes": "适合写实风格动作镜头。调用方需填入 {action} 和 {camera_motion}。",
+    "source": "builtin",
+    "priority": 50
+  }
+]

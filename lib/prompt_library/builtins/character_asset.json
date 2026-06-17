@@ -1,0 +1,30 @@
+[
+  {
+    "id": "character_manga_001",
+    "category": "character_asset",
+    "title": "漫剧角色设计基础模板",
+    "tags": ["漫剧", "竖屏", "角色", "基础"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["name", "description"],
+    "content": "生成角色「{name}」的标准设计图：{description}。纯白背景四格横版布局——左侧胸像特写（面部、发型、配饰、上装），右侧正面/四分之三侧面/背面全身A-Pose视图。角色外观在所有面板中完全一致，五官对称、手指完整为五指、肢体比例协调。",
+    "negative": "不同面板间角色外貌不一致，多指/少指，面部变形，模糊，背景杂乱",
+    "notes": "基础模板，适合大多数漫剧角色。调用方需先填入 {name} 和 {description}。",
+    "source": "builtin",
+    "priority": 80
+  },
+  {
+    "id": "character_realistic_001",
+    "category": "character_asset",
+    "title": "写实角色设计基础模板",
+    "tags": ["写实", "角色", "基础"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["name", "description"],
+    "content": "生成角色「{name}」的写实风格标准设计图：{description}。纯浅灰背景，正面全身立姿，均匀棚拍布光。五官写实自然，皮肤纹理可见，服装材质清晰。",
+    "negative": "卡通化，过度磨皮，身体比例失调，面部不对称，背景杂乱",
+    "notes": "适合写实风格短片。调用方需先填入 {name} 和 {description}。",
+    "source": "builtin",
+    "priority": 70
+  }
+]

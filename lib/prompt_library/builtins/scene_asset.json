@@ -1,0 +1,30 @@
+[
+  {
+    "id": "scene_manga_001",
+    "category": "scene_asset",
+    "title": "漫剧场景设计基础模板",
+    "tags": ["漫剧", "场景", "基础"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["name", "description"],
+    "content": "生成场景「{name}」的标准设计图：{description}。主画面占四分之三区域展示环境整体外观与氛围，右下角嵌入关键细节小图。空间透视正常，陈设固定，光影统一。",
+    "negative": "透视变形，元素漂移，光照不一致，不同视图间风格差异",
+    "notes": "基础模板，适合大多数漫剧场景。调用方需先填入 {name} 和 {description}。",
+    "source": "builtin",
+    "priority": 80
+  },
+  {
+    "id": "scene_interior_001",
+    "category": "scene_asset",
+    "title": "室内场景设计模板",
+    "tags": ["室内", "场景", "暖光"],
+    "language": "zh",
+    "format_type": "template",
+    "variables": ["name", "description"],
+    "content": "生成室内场景「{name}」的标准设计图：{description}。暖色室内布光，突出空间纵深与陈设细节。主画面展示整体布局，右下角展示材质/装饰特写。",
+    "negative": "室外光线混入，空间扁平无纵深，材质模糊，装饰元素错位",
+    "notes": "适合室内场景。调用方需先填入 {name} 和 {description}。",
+    "source": "builtin",
+    "priority": 60
+  }
+]

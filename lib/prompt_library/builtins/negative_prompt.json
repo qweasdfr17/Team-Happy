@@ -1,0 +1,30 @@
+[
+  {
+    "id": "negative_manga_default_001",
+    "category": "negative_prompt",
+    "title": "漫剧通用负面提示词",
+    "tags": ["漫剧", "通用", "默认"],
+    "language": "zh",
+    "format_type": "raw",
+    "variables": [],
+    "content": "画面避免：画面崩坏、比例失调；多指/少指/手指粘连；面部畸形/五官错位；肢体断裂/关节反转；文字/水印/Logo 出现在画面中。",
+    "negative": "",
+    "notes": "默认漫剧负面提示词，大多数镜头直接复用。raw 格式无需填变量。",
+    "source": "builtin",
+    "priority": 90
+  },
+  {
+    "id": "negative_realistic_default_001",
+    "category": "negative_prompt",
+    "title": "写实通用负面提示词",
+    "tags": ["写实", "通用", "默认"],
+    "language": "zh",
+    "format_type": "raw",
+    "variables": [],
+    "content": "画面避免：卡通化/动画风格；过度磨皮/美颜滤镜感；身体比例失调；面部不对称；文字/水印/Logo 出现在画面中；恐怖谷效应。",
+    "negative": "",
+    "notes": "默认写实负面提示词。raw 格式无需填变量。",
+    "source": "builtin",
+    "priority": 80
+  }
+]
