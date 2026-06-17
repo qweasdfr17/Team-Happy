@@ -1335,6 +1335,41 @@ async def test_patch_reference_video_unit_prompt_writes_ad_prompt_override(
     assert "shots" not in unit
 
 
+async def test_patch_reference_video_unit_prompt_infers_ad_references(
+    ad_reference_ctx: ToolContext,
+) -> None:
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = ad_reference_ctx.pm
+    product_name = next(iter(pm.project_payload["products"]))  # type: ignore[attr-defined]
+    character_name = next(iter(pm.project_payload["characters"]))  # type: ignore[attr-defined]
+    pm.script_payload["reference_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shot_ids": ["E1S1", "E1S2"],
+            "references": [],
+            "generated_assets": {"status": "pending"},
+        }
+    ]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(ad_reference_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            "prompt": f"图片1：产品参考图 — {product_name}\n图片2：角色参考图 — {character_name}\n成品提示词正文",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    unit = pm.script_payload["reference_units"][0]  # type: ignore[attr-defined]
+    assert unit["references"] == [
+        {"type": "product", "name": product_name},
+        {"type": "character", "name": character_name},
+    ]
+
+
 async def test_generate_video_episode_ad_reference_uses_prompt_override(
     ad_reference_ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -262,6 +262,33 @@ async def test_ad_reference_execute_uses_prompt_override(tmp_path: Path, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_ad_reference_execute_replaces_prompt_override_mentions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from server.services import reference_video_tasks as rvt
+
+    proj_dir = _write_ad_project(tmp_path)
+    script_path = proj_dir / "scripts" / "episode_1.json"
+    script = json.loads(script_path.read_text(encoding="utf-8"))
+    product_name = script["reference_units"][0]["references"][0]["name"]
+    character_name = script["reference_units"][0]["references"][1]["name"]
+    script["reference_units"][0]["prompt_override"] = f"成品提示词：@{product_name} 递给 @{character_name}"
+    script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
+    fake_generator = _wire_executor(proj_dir, monkeypatch)
+
+    await rvt.execute_reference_video_task(
+        "ad-demo",
+        "E1U1",
+        {"script_file": "scripts/episode_1.json"},
+        user_id="u1",
+    )
+
+    prompt = fake_generator.generate_video_async.call_args.kwargs["prompt"]
+    assert "[图1]" in prompt
+    assert "[图3]" in prompt
+    assert f"@{product_name}" not in prompt
+    assert f"@{character_name}" not in prompt
+
+
+@pytest.mark.asyncio
 async def test_ad_reference_clamp_keeps_product_sheets_alive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     """超后端参考上限时产品 sheet 跨产品稳定前置存活，[图N] 对照表与实收列表对齐。"""
     from server.services import reference_video_tasks as rvt

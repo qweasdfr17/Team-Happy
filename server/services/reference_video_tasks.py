@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,7 @@ from server.services.generation_tasks import (
 )
 
 logger = logging.getLogger(__name__)
+_AD_MENTION_RE = re.compile(r"@\[([^\]\r\n]+)\]|@([A-Za-z0-9_\u4e00-\u9fff]+)")
 
 
 def _resolve_unit_references(
@@ -263,6 +265,18 @@ def _render_ad_unit_prompt_for_backend(
     )
     if not body.strip():
         raise ValueError("reference video unit prompt is empty: all member shots have no visual content")
+    index_by_name: dict[str, int] = {}
+    for index, entry in enumerate(entries, start=1):
+        name = entry.get("name")
+        if isinstance(name, str) and name and name not in index_by_name:
+            index_by_name[name] = index
+
+    def _replace_mention(match: re.Match[str]) -> str:
+        name = match.group(1) or match.group(2) or ""
+        index = index_by_name.get(name)
+        return f"[图{index}]" if index else match.group(0)
+
+    body = _AD_MENTION_RE.sub(_replace_mention, body)
     legend = render_reference_legend([str(e.get("label") or "") for e in entries])
     prompt = f"{body}\n\n{legend}" if legend else body
     product_names = list(dict.fromkeys(e["name"] for e in entries if e.get("kind") in ("sheet", "original")))
