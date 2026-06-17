@@ -286,24 +286,53 @@ export function ReferenceVideoCanvas({
 
   const isDirty = !!(selected && dirtyMap[selected.unit_id]);
 
-  // 单 shot unit：秒数修改同步到 prompt 文本中的 Shot header
+  // 单 shot unit：秒数修改。duration_override 时直接 patchUnit；
+  // 否则修改 prompt 中 Shot 1 (Xs): header。
   const handleDurationChange = useCallback(
     (_segmentId: string, _fieldOrPatch: string | Record<string, unknown>, value?: unknown) => {
       if (!selected || selected.shots.length !== 1) return;
       const newSec = typeof value === "number" ? value : parseInt(String(value), 10);
       if (!Number.isFinite(newSec) || newSec < 1) return;
-      const currentShot = selected.shots[0];
-      const oldSec = currentShot.duration;
-      if (newSec === oldSec) return;
-      const newText = currentText.replace(
-        new RegExp(`Shot 1 \\(${oldSec}s\\)`),
-        `Shot 1 (${newSec}s)`,
-      );
-      if (newText !== currentText) {
-        handlePromptChange(newText);
+      if (newSec === selected.duration_seconds) return;
+
+      if (selected.duration_override) {
+        // duration_override=true：直接写 duration_seconds，不经过 prompt header
+        const key = draftKey(projectName, episode, selected.unit_id);
+        const draftText = drafts[key];
+        const hasPromptDraft = draftText !== undefined && draftText !== unitPromptText(selected);
+        const body: { duration_seconds: number; prompt?: string; references?: ReferenceResource[] } = {
+          duration_seconds: newSec,
+        };
+        if (hasPromptDraft) {
+          body.prompt = draftText!;
+          body.references = mergeReferences(draftText!, selected.references, project ?? null);
+        }
+        setSaving(true);
+        patchUnit(projectName, episode, selected.unit_id, body)
+          .then(() => {
+            if (hasPromptDraft) {
+              setDrafts((d) => {
+                if (d[key] !== draftText) return d;
+                const copy = { ...d };
+                delete copy[key];
+                return copy;
+              });
+            }
+          })
+          .catch((e) => toastError(e))
+          .finally(() => setSaving(false));
+      } else {
+        // 非 override：替换 prompt 中首个 Shot header
+        const newText = currentText.replace(
+          /^Shot\s+1\s+\(\d+s\):/m,
+          `Shot 1 (${newSec}s):`,
+        );
+        if (newText !== currentText) {
+          handlePromptChange(newText);
+        }
       }
     },
-    [selected, currentText, handlePromptChange],
+    [selected, currentText, handlePromptChange, projectName, episode, drafts, project, patchUnit],
   );
 
   // 参考生视频单镜头秒数范围 1-15
