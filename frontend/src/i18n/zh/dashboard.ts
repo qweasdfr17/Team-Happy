@@ -1286,6 +1286,14 @@ export default {
   'context_pack_regenerated': '已生成 · {{shots}} 镜 {{chars}} 角色',
   'context_pack_regenerated_short': '理解包 ✓',
 
+  'script_policy_label': '剧本处理策略',
+  'script_policy_preserve': '原样使用我的剧本',
+  'script_policy_preserve_desc': 'AI 只能切分、提取角色和生成提示词，不修改原文',
+  'script_policy_suggest': '先给我修改建议',
+  'script_policy_suggest_desc': 'AI 生成改稿建议但不直接写入，用户审核后再决定',
+  'script_policy_rewrite': '允许 AI 改写',
+  'script_policy_rewrite_desc': '（预留）用户确认后允许 AI 改写剧本',
+
   // ---- 项目大厅 · Darkroom ----
   'lobby_brand_subtitle': '工作台',
   'lobby_search_placeholder': '搜索项目',

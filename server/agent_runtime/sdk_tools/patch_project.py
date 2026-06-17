@@ -37,6 +37,7 @@ _SETTINGS_WHITELIST = (
     "planning_max_episodes",
     "narration_voice",
     "narration_speed",
+    "script_policy",
 )
 _SOURCE_LANGUAGE_VALUES = ("zh", "en", "vi")
 _POSITIVE_INT_SETTINGS = ("episode_target_units", "planning_window_chars", "planning_max_episodes")
@@ -239,6 +240,12 @@ def _validate_setting_value(key: str, value: Any) -> None:
             is_valid = False
         if not is_valid:
             raise ValueError(f"narration_speed 必须是正的有限数值或 null,收到 {value!r}")
+        return
+    if key == "script_policy":
+        if value is None:
+            return
+        from lib.script_policy import validate_script_policy  # lazy to avoid import noise
+        validate_script_policy(value)
         return
     # 不应到这,白名单校验在调用前
     raise ValueError(f"settings 字段 {key!r} 缺类型校验")

@@ -1285,6 +1285,14 @@ export default {
   'context_pack_regenerated': 'Ready · {{shots}} shots {{chars}} chars',
   'context_pack_regenerated_short': 'Pack ✓',
 
+  'script_policy_label': 'Script Policy',
+  'script_policy_preserve': 'Use my script as-is',
+  'script_policy_preserve_desc': 'AI only splits, extracts assets, and generates prompts — no text changes',
+  'script_policy_suggest': 'Suggest rewrites first',
+  'script_policy_suggest_desc': 'AI drafts suggestions without overwriting; user reviews before applying',
+  'script_policy_rewrite': 'Allow AI rewrites',
+  'script_policy_rewrite_desc': '(Reserved) AI rewrites applied after user approval',
+
   // ---- Projects lobby · Darkroom ----
   'lobby_brand_subtitle': 'Studio',
   'lobby_search_placeholder': 'Search projects',

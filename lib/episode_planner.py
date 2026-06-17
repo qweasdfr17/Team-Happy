@@ -24,6 +24,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from lib.script_policy import PRESERVE_PROMPT_TAIL, is_preserve_mode
 from lib.episode_ledger import (
     backfill_episode_ledger,
     discover_episode_files,
@@ -1068,4 +1069,9 @@ def _build_planning_prompt(
         lines += [f"- {reason}" for reason in failure]
 
     lines += ["", "# 剧本原文片段" if is_screenplay else "# 小说原文片段", "---", window, "---"]
+
+    # screenplay + preserve 模式：注入原文保护约束
+    if is_screenplay and is_preserve_mode(dict(project)):
+        lines += ["", PRESERVE_PROMPT_TAIL]
+
     return "\n".join(lines)
