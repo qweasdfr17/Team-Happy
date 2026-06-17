@@ -1,0 +1,16 @@
+[
+  {
+    "id": "case_manga_emotional_001",
+    "category": "case_study",
+    "title": "案例：漫剧情感转折镜头组",
+    "tags": ["漫剧", "情感", "特写", "慢节奏"],
+    "language": "zh",
+    "format_type": "reference",
+    "variables": [],
+    "content": "参考案例——情感转折镜头组（约15秒/3镜）：镜1(5s, Medium Close-up)：角色A侧脸，窗边逆光，睫毛微颤。镜2(4s, Close-up)：手中信纸的折痕特写，手指微微收紧。镜3(6s, Medium Shot)：角色A缓缓抬头，眼角有泪光但未落下，雨丝拍在窗格上。此案例示范用动作细节和光影承载情绪，而非内心独白。",
+    "negative": "",
+    "notes": "reference 格式，不作为 AI 生成 prompt 直接使用。成功要素：动作可观察、情绪不直说、环境与内心呼应。",
+    "source": "builtin",
+    "priority": 40
+  }
+]

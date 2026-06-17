@@ -1,0 +1,30 @@
+[
+  {
+    "id": "director_rewrite_climax_001",
+    "category": "director_rewrite",
+    "title": "高潮段落改稿参考",
+    "tags": ["漫剧", "高潮", "冲突", "情感"],
+    "language": "zh",
+    "format_type": "reference",
+    "variables": [],
+    "content": "高潮段落改稿要点：1. 镜头节奏加速，单镜时长缩短至2-3秒；2. 特写占比提升（面部/手部/关键道具）；3. 运镜从静态切为动态（推近/跟踪）；4. 环境音效加强（风声/心跳/重击）；5. 台词精简至每镜一句，留白给画面。",
+    "negative": "",
+    "notes": "reference 格式，不作为 AI 生成 prompt 直接使用。剧本编辑参考。",
+    "source": "builtin",
+    "priority": 50
+  },
+  {
+    "id": "director_rewrite_opening_001",
+    "category": "director_rewrite",
+    "title": "开场建立改稿参考",
+    "tags": ["漫剧", "开场", "建立", "氛围"],
+    "language": "zh",
+    "format_type": "reference",
+    "variables": [],
+    "content": "开场建立改稿要点：1. 首镜至少5秒，用远景/中远景建立空间；2. 前3镜逐步引入角色（环境→局部→面部）；3. 光线和色调定下全片基调；4. 环境音效建立空间感；5. 第一句台词或口播不早于第3镜。",
+    "negative": "",
+    "notes": "reference 格式，不作为 AI 生成 prompt 直接使用。剧本编辑参考。",
+    "source": "builtin",
+    "priority": 50
+  }
+]
