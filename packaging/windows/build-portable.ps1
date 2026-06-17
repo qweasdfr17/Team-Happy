@@ -62,6 +62,7 @@ Copy-DirectoryClean (Join-Path $repoRoot "frontend\dist") (Join-Path $packageRoo
 
 Copy-RequiredFile (Join-Path $repoRoot "pyproject.toml") (Join-Path $packageRoot "pyproject.toml")
 Copy-RequiredFile (Join-Path $repoRoot "uv.lock") (Join-Path $packageRoot "uv.lock")
+Copy-RequiredFile (Join-Path $repoRoot "README.md") (Join-Path $packageRoot "README.md")
 Copy-RequiredFile (Join-Path $repoRoot "alembic.ini") (Join-Path $packageRoot "alembic.ini")
 Copy-RequiredFile (Join-Path $repoRoot "skills-lock.json") (Join-Path $packageRoot "skills-lock.json")
 Copy-RequiredFile (Join-Path $repoRoot "CLAUDE.md") (Join-Path $packageRoot "CLAUDE.md")
