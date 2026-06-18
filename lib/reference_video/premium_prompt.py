@@ -27,11 +27,16 @@ def _asset_list(project: dict) -> dict[str, str]:
 def _gather_unit_assets(
     unit: dict, project: dict
 ) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, str]]]:
-    """从 unit 的 shots 中收集角色/场景/道具引用。
+    """从 unit 的 shots 和 references 中收集角色/场景/道具引用。
+
+    reference_video 的 Shot 仅有 text + duration，asset 信息在 unit.references 中。
+    同时扫描 shot.text 中的 @mention 作为补充。
 
     Returns:
         (characters, scenes, props): each is [(name, sheet_path), ...]
     """
+    import re
+
     chars: dict[str, str] = {}
     scs: dict[str, str] = {}
     prps: dict[str, str] = {}
@@ -40,31 +45,41 @@ def _gather_unit_assets(
     project_scenes = (project.get("scenes") or {}) if isinstance(project.get("scenes"), dict) else {}
     project_props = (project.get("props") or {}) if isinstance(project.get("props"), dict) else {}
 
-    for shot in unit.get("shots") or []:
-        if not isinstance(shot, dict):
-            continue
-        for name in shot.get("characters_in_shot") or []:
-            if isinstance(name, str) and name in project_chars:
-                chars[name] = project_chars[name].get("character_sheet", "") if isinstance(project_chars[name], dict) else ""
-        for name in shot.get("scenes") or []:
-            if isinstance(name, str) and name in project_scenes:
-                scs[name] = project_scenes[name].get("scene_sheet", "") if isinstance(project_scenes[name], dict) else ""
-        for name in shot.get("props") or []:
-            if isinstance(name, str) and name in project_props:
-                prps[name] = project_props[name].get("prop_sheet", "") if isinstance(project_props[name], dict) else ""
-
-    # Also scan existing unit references
+    # 主要来源：unit.references
     for ref in unit.get("references") or []:
         if not isinstance(ref, dict):
             continue
         rtype = ref.get("type", "")
         rname = ref.get("name", "")
-        if rtype == "character" and rname in project_chars and rname not in chars:
-            chars[rname] = project_chars[rname].get("character_sheet", "") if isinstance(project_chars[rname], dict) else ""
-        elif rtype == "scene" and rname in project_scenes and rname not in scs:
-            scs[rname] = project_scenes[rname].get("scene_sheet", "") if isinstance(project_scenes[rname], dict) else ""
-        elif rtype == "prop" and rname in project_props and rname not in prps:
-            prps[rname] = project_props[rname].get("prop_sheet", "") if isinstance(project_props[rname], dict) else ""
+        if rtype == "character" and rname in project_chars:
+            sheet = project_chars[rname].get("character_sheet", "") if isinstance(project_chars[rname], dict) else ""
+            chars[rname] = sheet
+        elif rtype == "scene" and rname in project_scenes:
+            sheet = project_scenes[rname].get("scene_sheet", "") if isinstance(project_scenes[rname], dict) else ""
+            scs[rname] = sheet
+        elif rtype == "prop" and rname in project_props:
+            sheet = project_props[rname].get("prop_sheet", "") if isinstance(project_props[rname], dict) else ""
+            prps[rname] = sheet
+
+    # 补充：扫 shot.text 中的 @mention
+    mention_re = re.compile(r"@\[([^\]]+)\]|@([\w一-鿿]+)")
+    for shot in unit.get("shots") or []:
+        if not isinstance(shot, dict):
+            continue
+        text = shot.get("text", "") or ""
+        for m in mention_re.finditer(text):
+            name = m.group(1) or m.group(2)
+            if not name:
+                continue
+            if name in project_chars and name not in chars:
+                sheet = project_chars[name].get("character_sheet", "") if isinstance(project_chars[name], dict) else ""
+                chars[name] = sheet
+            elif name in project_scenes and name not in scs:
+                sheet = project_scenes[name].get("scene_sheet", "") if isinstance(project_scenes[name], dict) else ""
+                scs[name] = sheet
+            elif name in project_props and name not in prps:
+                sheet = project_props[name].get("prop_sheet", "") if isinstance(project_props[name], dict) else ""
+                prps[name] = sheet
 
     return (
         [(n, chars[n]) for n in chars],
@@ -176,6 +191,9 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
 def apply_premium_prompt_to_unit(unit: dict, project: dict) -> dict:
     """为 unit 生成精品提示词，写入 shots[].text 并推断 references。
 
+    保留字段：unit_id / duration_seconds / generated_assets /
+    transition_to_next / note 均不修改。
+
     Args:
         unit: video_units[] 条目
         project: project.json dict
@@ -183,25 +201,29 @@ def apply_premium_prompt_to_unit(unit: dict, project: dict) -> dict:
     Returns:
         修改后的 unit（原地修改 + 返回）
     """
+    # 记录原始总时长（_add_metadata 已写入）
+    total_duration: int = int(unit.get("duration_seconds", 0))
+    if total_duration <= 0:
+        # 回退：从原 shots 求和
+        total_duration = sum(int(s.get("duration", 5)) for s in (unit.get("shots") or []) if isinstance(s, dict))
+
     prompt = render_unit_prompt_premium(unit, project)
-    # 单 shot 模式：整段提示词为 shots[0].text
-    unit["shots"] = [{"text": prompt, "duration": unit.get("duration_seconds", 8)}]
+
+    # 替换为单 shot：duration = 原总时长，text = 精品提示词全文
+    unit["shots"] = [{"text": prompt, "duration": total_duration}]
+    unit["duration_seconds"] = total_duration
     unit["duration_override"] = True
 
-    # 推断 references 并写入
+    # 推断 references：
+    #   - 推断成功 → 写入推断结果
+    #   - 推断失败 → 保留旧 references（不清空）
+    #   - 推断失败 + 旧 references 为空 → 设为空列表
+    old_refs: list = unit.get("references") or []
     inferred = infer_references_from_prompt_text(project, prompt)
     if inferred:
         unit["references"] = inferred
-    elif not unit.get("references"):
-        # 回退：从 unit 数据直接构建
-        refs = []
-        seen = set()
-        for ref in unit.get("references") or []:
-            key = (ref.get("type"), ref.get("name"))
-            if key not in seen:
-                seen.add(key)
-                refs.append(ref)
-        unit["references"] = refs
+    elif not old_refs:
+        unit["references"] = []
 
     return unit
 
