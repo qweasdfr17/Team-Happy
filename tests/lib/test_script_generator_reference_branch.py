@@ -367,3 +367,87 @@ async def test_effective_generation_mode_honors_episode_override(tmp_path: Path)
     assert "ReferenceVideoScript" in prompt
     assert "references" in prompt
     assert "@[名称]" in prompt
+
+
+@pytest.mark.asyncio
+async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
+    """reference_video + narration 生成后，video_units 应被后处理为精品提示词格式。
+
+    回归覆盖：红框 (ReferenceVideoCard) 的数据源是 video_units[].shots[0].text
+    + duration_override=true，生成后必须立即符合此契约，不能等到 agent 手动写回。
+    """
+    import json as _j
+
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "project.json").write_text(
+        _j.dumps(
+            {
+                "title": "t",
+                "content_mode": "narration",
+                "generation_mode": "reference_video",
+                "_supported_durations": [4, 8],
+                "overview": {"synopsis": "s", "genre": "g", "theme": "t", "world_setting": "w"},
+                "style": "国漫",
+                "style_description": "水墨",
+                "characters": {"主角": {"description": "d"}},
+                "scenes": {"酒馆": {"description": "古朴酒馆"}},
+                "props": {},
+                "episodes": [{"episode": 1, "generation_mode": "reference_video"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    drafts = project_dir / "drafts" / "episode_1"
+    drafts.mkdir(parents=True)
+    (drafts / "step1_reference_units.md").write_text("E1U1 stub", encoding="utf-8")
+
+    fake_generator = MagicMock()
+    fake_generator.model = "mock"
+    fake_generator.generate = AsyncMock(
+        return_value=MagicMock(
+            text=(
+                '{"episode":1,"title":"t",'
+                '"summary":"s","novel":{"title":"t","chapter":"1"},'
+                '"video_units":[{"unit_id":"E1U1",'
+                '"shots":[{"duration":3,"text":"主角推门"},{"duration":2,"text":"环顾四周"}],'
+                '"references":[{"type":"character","name":"主角"},{"type":"scene","name":"酒馆"}],'
+                '"duration_seconds":5,"duration_override":false,"transition_to_next":"cut"}]}'
+            )
+        )
+    )
+
+    gen = ScriptGenerator(project_dir, generator=fake_generator)
+    out = await gen.generate(episode=1)
+    data = _j.loads(out.read_text(encoding="utf-8"))
+
+    unit = data["video_units"][0]
+
+    # 红框契约：duration_override 必须为 true
+    assert unit["duration_override"] is True, "精品提示词必须设置 duration_override=true"
+
+    # 红框契约：单 shot，duration = 原总时长
+    assert len(unit["shots"]) == 1, "精品提示词必须是单 shot"
+    assert unit["shots"][0]["duration"] == 5, "shot duration 必须等于原总时长"
+    assert unit["duration_seconds"] == 5, "duration_seconds 保持原总时长"
+
+    # 红框契约：shot text 是精品提示词格式，不是原版简单 shot 文本
+    prompt = unit["shots"][0]["text"]
+    assert "【图片引用声明】" in prompt
+    assert "图片1：主角" in prompt
+    assert "图片2：酒馆" in prompt
+    assert "【切片段" in prompt
+    assert "【负面约束】" in prompt
+
+    # 不得出现 Shot header 拼接格式（原版简单提示词）
+    assert "Shot 1" not in prompt
+    assert "Shot 2" not in prompt
+
+    # references 已同步写入
+    ref_names = {(r["type"], r["name"]) for r in unit.get("references", [])}
+    assert ("character", "主角") in ref_names
+    assert ("scene", "酒馆") in ref_names
+
+    # generated_assets / transition_to_next 不丢
+    assert "generated_assets" in unit
+    assert unit["transition_to_next"] == "cut"

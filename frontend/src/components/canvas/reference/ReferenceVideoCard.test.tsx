@@ -104,6 +104,53 @@ describe("ReferenceVideoCard", () => {
     expect(ta.value).toBe("plain text with no header");
   });
 
+  // 回归：红框在精品提示词模式下必须原样展示完整 prompt，
+  // 不得插入 "Shot 1 (Xs):" header 拼接。
+  it("displays full premium prompt without synthesized Shot headers when duration_override is true", () => {
+    const premiumText = [
+      "【图片引用声明】",
+      "图片1：萧近宸",
+      "图片2：王府书房",
+      "",
+      "【全局视频要求】",
+      "国漫。水墨渲染风格。",
+      "横屏 16:9，多场景，多角度，60fps 流畅动画。",
+      "",
+      "【场景设计】",
+      "场景：王府书房，自然光，室内。",
+      "",
+      "【切片段1】",
+      "时长：5s",
+      "画面：萧近宸推门而入",
+      "",
+      "【切片段2】",
+      "时长：3s",
+      "画面：合上话本，目光深邃",
+      "",
+      "【负面约束】",
+      "禁止字幕、水印、Logo。",
+    ].join("\n");
+
+    const unit = mkUnit({
+      shots: [{ duration: 8, text: premiumText }],
+      duration_seconds: 8,
+      duration_override: true,
+    });
+    render(<ControlledCard unit={unit} />);
+    const ta = screen.getByRole("combobox") as HTMLTextAreaElement;
+
+    // textarea 原样展示精品提示词全文
+    expect(ta.value).toBe(premiumText);
+    // 精品提示词包含关键结构
+    expect(ta.value).toContain("【图片引用声明】");
+    expect(ta.value).toContain("【切片段1】");
+    expect(ta.value).toContain("【切片段2】");
+    expect(ta.value).toContain("【负面约束】");
+    // 禁止出现自动拼接的 Shot header
+    expect(ta.value).not.toMatch(/Shot \d/);
+    expect(ta.value).not.toContain("(8s):");
+  });
+
   it("fires onChange with the new prompt text on every edit", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
