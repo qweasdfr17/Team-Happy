@@ -1818,3 +1818,139 @@ class TestListCharacterVariants:
         assert out.get("is_error") is not True, out
         text = out.get("content", [{}])[0].get("text", "")
         assert "没有找到" in text or "没有" in text
+
+
+# ---------------------------------------------------------------------------
+# reset_episode_plan MCP tool
+# ---------------------------------------------------------------------------
+
+
+class TestResetEpisodePlan:
+    async def test_no_confirm_returns_warning_only(self, fake_ctx: ToolContext, tmp_path):
+        """confirm=false 不修改任何数据。"""
+        from server.agent_runtime.sdk_tools.episode_planning import reset_episode_plan_tool
+
+        pm = fake_ctx.pm
+        pm.project_payload["episodes"] = [{"episode": 1, "title": "测试"}]
+        pm.project_payload["planning_cursor"] = {"source_file": "novel.txt", "offset": 100}
+
+        tool_obj = reset_episode_plan_tool(fake_ctx)
+        out = await _call(tool_obj, {"confirm": False})
+
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "confirm=true" in text.lower() or "confirm" in text.lower()
+        # 未做任何修改
+        assert len(pm.project_payload["episodes"]) == 1
+        assert pm.project_payload["planning_cursor"] is not None
+
+    async def test_confirm_clears_planning_state(self, fake_ctx: ToolContext, tmp_path):
+        """confirm=true 清空 episodes / planning_cursor / 规划设置。"""
+        from server.agent_runtime.sdk_tools.episode_planning import reset_episode_plan_tool
+
+        pm = fake_ctx.pm
+        pm.project_payload["episodes"] = [
+            {"episode": 1, "title": "第一集"},
+            {"episode": 2, "title": "第二集"},
+        ]
+        pm.project_payload["planning_cursor"] = {"source_file": "novel.txt", "offset": 200}
+        pm.project_payload["episode_target_units"] = 10
+        pm.project_payload["planning_window_chars"] = 5000
+        pm.project_payload["planning_max_episodes"] = 15
+
+        tool_obj = reset_episode_plan_tool(fake_ctx)
+        out = await _call(tool_obj, {"confirm": True, "delete_generated_files": False})
+
+        assert out.get("is_error") is not True, out
+        # episodes 已清空
+        assert pm.project_payload["episodes"] == []
+        # planning_cursor 已清空
+        assert pm.project_payload.get("planning_cursor") is None
+        # 规划设置已清除
+        assert "episode_target_units" not in pm.project_payload
+        assert "planning_window_chars" not in pm.project_payload
+        assert "planning_max_episodes" not in pm.project_payload
+
+    async def test_delete_generated_files_cleans_derived(self, fake_ctx: ToolContext, tmp_path):
+        """delete_generated_files=true 删除 scripts/source/drafts 派生文件。"""
+        from server.agent_runtime.sdk_tools.episode_planning import reset_episode_plan_tool
+
+        project_dir = tmp_path / "demo"
+        project_dir.mkdir(parents=True, exist_ok=True)
+        # 创建派生文件
+        (project_dir / "scripts").mkdir(exist_ok=True)
+        (project_dir / "scripts" / "episode_1.json").write_text("{}")
+        (project_dir / "scripts" / "episode_2.json").write_text("{}")
+        (project_dir / "source").mkdir(exist_ok=True)
+        (project_dir / "source" / "episode_1.txt").write_text("text")
+        (project_dir / "source" / "novel.txt").write_text("original novel")
+        (project_dir / "drafts").mkdir(exist_ok=True)
+        (project_dir / "drafts" / "episode_1").mkdir(exist_ok=True)
+        (project_dir / "drafts" / "episode_2").mkdir(exist_ok=True)
+
+        pm = fake_ctx.pm
+        pm.project_payload["episodes"] = [{"episode": 1}]
+        pm._project_dir = project_dir
+
+        tool_obj = reset_episode_plan_tool(fake_ctx)
+        out = await _call(tool_obj, {"confirm": True, "delete_generated_files": True})
+
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "scripts" in text.lower() or "scripts" in text
+        assert "已删除" in text or "deleted" in text.lower() or "个" in text
+
+        # 派生文件已删除
+        assert not (project_dir / "scripts" / "episode_1.json").exists()
+        assert not (project_dir / "scripts" / "episode_2.json").exists()
+        assert not (project_dir / "source" / "episode_1.txt").exists()
+        assert not (project_dir / "drafts" / "episode_1").exists()
+        assert not (project_dir / "drafts" / "episode_2").exists()
+
+        # 原始小说保留
+        assert (project_dir / "source" / "novel.txt").exists()
+
+    async def test_delete_generated_files_false_preserves_files(self, fake_ctx: ToolContext, tmp_path):
+        """delete_generated_files=false 时 plan 清空但文件保留。"""
+        from server.agent_runtime.sdk_tools.episode_planning import reset_episode_plan_tool
+
+        project_dir = tmp_path / "demo"
+        project_dir.mkdir(parents=True, exist_ok=True)
+        (project_dir / "scripts").mkdir(exist_ok=True)
+        script_file = project_dir / "scripts" / "episode_1.json"
+        script_file.write_text("{}")
+
+        pm = fake_ctx.pm
+        pm.project_payload["episodes"] = [{"episode": 1}]
+        pm._project_dir = project_dir
+
+        tool_obj = reset_episode_plan_tool(fake_ctx)
+        out = await _call(tool_obj, {"confirm": True, "delete_generated_files": False})
+
+        assert out.get("is_error") is not True, out
+        # 文件保留
+        assert script_file.exists()
+        # plan 已清空
+        assert pm.project_payload["episodes"] == []
+
+    async def test_characters_scenes_props_preserved(self, fake_ctx: ToolContext, tmp_path):
+        """角色/场景/道具/产品不受影响。"""
+        from server.agent_runtime.sdk_tools.episode_planning import reset_episode_plan_tool
+
+        pm = fake_ctx.pm
+        pm.project_payload["episodes"] = [{"episode": 1}]
+        original_chars = dict(pm.project_payload["characters"])
+        original_scenes = dict(pm.project_payload["scenes"])
+
+        tool_obj = reset_episode_plan_tool(fake_ctx)
+        out = await _call(tool_obj, {"confirm": True, "delete_generated_files": False})
+
+        assert out.get("is_error") is not True, out
+        assert pm.project_payload["characters"] == original_chars
+        assert pm.project_payload["scenes"] == original_scenes
+
+    async def test_tool_registered_in_mcp_ids(self):
+        """reset_episode_plan 已注册到 MCP 工具列表。"""
+        from server.agent_runtime.sdk_tools import ARCREEL_MCP_TOOL_IDS
+
+        assert "reset_episode_plan" in ARCREEL_MCP_TOOL_IDS
