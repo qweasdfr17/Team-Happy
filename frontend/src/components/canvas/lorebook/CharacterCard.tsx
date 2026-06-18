@@ -340,7 +340,19 @@ export function CharacterCard({
       {/* ---- Image area ---- */}
       <div className="mb-4 space-y-3">
         <div>
-          <CapsLabel>{t("character_design")}</CapsLabel>
+          <div className="flex items-center justify-between">
+            <CapsLabel>{t("character_design")}</CapsLabel>
+            {character.character_sheet && (
+              <button
+                type="button"
+                onClick={() => sheetInputRef.current?.click()}
+                disabled={uploadingSheet}
+                className="focus-ring text-[11px] text-[var(--color-text-3)] transition-colors hover:text-[var(--color-text)]"
+              >
+                {uploadingSheet ? "..." : t("assets:replace_image")}
+              </button>
+            )}
+          </div>
           <div
             className="mt-1.5 overflow-hidden rounded-lg"
             style={{ border: "1px solid var(--color-hairline-soft)" }}

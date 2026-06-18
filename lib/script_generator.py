@@ -280,6 +280,17 @@ class ScriptGenerator:
         # 补充元数据
         script_data = self._add_metadata(script_data, episode)
 
+        # reference_video 模式：将 LLM 生成的简单 shots[].text 替换为精品提示词格式
+        if self.content_mode != "ad" and self._effective_generation_mode(episode) == "reference_video":
+            try:
+                from lib.reference_video.premium_prompt import apply_premium_prompt_to_unit
+
+                for unit in script_data.get("video_units") or []:
+                    if isinstance(unit, dict):
+                        apply_premium_prompt_to_unit(unit, self.project_json)
+            except Exception:
+                logger.warning("精品提示词后处理失败，保留原版提示词", exc_info=True)
+
         # 经写盘统一入口保存：整集生成无「改前」，按严格结构校验（等价原 response_schema 的
         # Pydantic 校验），并继承 metadata 重算、加锁、filename↔episode 一致性与 project.json
         # 同步——消除「裸 json.dump 旁路」，使 _write_script_unlocked 成为剧本唯一写入点。
