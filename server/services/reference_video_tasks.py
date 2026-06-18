@@ -336,9 +336,18 @@ async def execute_reference_video_task(
         inferred = infer_references_from_prompt_text(project, raw_prompt) if raw_prompt else []
         effective_refs = inferred if inferred else (unit.get("references") or [])
         source_refs = _resolve_unit_references(project, project_path, effective_refs)
-        # 如果是推断出来的引用，更新 unit 用于后续 prompt 渲染
-        if inferred:
-            unit = {**unit, "references": effective_refs}
+        # 如果是推断出来的引用，写回脚本 JSON 使 UI 红框同步显示
+        if inferred and effective_refs != (unit.get("references") or []):
+            unit["references"] = effective_refs
+            try:
+                pm = get_project_manager()
+                with pm.locked_script(project_name, script_file, validate=False) as script:
+                    units = (script.get("reference_units") if is_ad else script.get("video_units")) or []
+                    target = next((u for u in units if isinstance(u, dict) and u.get("unit_id") == resource_id), None)
+                    if target is not None:
+                        target["references"] = effective_refs
+            except Exception:
+                logger.warning("持久化推断 references 失败，继续生成", exc_info=True)
 
     # 3. 构造 generator（拿到 video_backend 名字后才能做 provider 特判）
     generator = await get_media_generator(project_name, payload=payload, user_id=user_id)

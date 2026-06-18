@@ -200,6 +200,12 @@ def patch_reference_video_unit_prompt_tool(ctx: ToolContext):
                         refs = inferred or unit.get("references")
                     _apply_prompt_to_ad_reference_unit(unit, prompt, refs)
                 else:
+                    # video_units (narration/drama)：agent 可能省略 references 参数。
+                    # 此时从成品提示词文本推断 references，确保 prompt 中的
+                    # "图片1：萧近宸" 等声明能同步写入 unit.references。
+                    if refs is None:
+                        inferred = _infer_refs_from_text(project, prompt)
+                        refs = inferred or unit.get("references")
                     _apply_prompt_to_unit(unit, prompt, duration_seconds, refs)
 
             return {

@@ -1894,6 +1894,90 @@ class ProjectManager:
 
         return self.update_project(project_name, _mutate)
 
+    def _clear_asset_sheet(self, asset_type: str, project_name: str, name: str) -> dict:
+        """清空资产 sheet 字段并安全删除对应磁盘文件。
+
+        资产不存在抛 KeyError；文件在项目目录外不删除（safe path 校验）；
+        文件不存在不报错。通过 update_project 在单一文件锁内完成。
+        """
+        spec = ASSET_SPECS[asset_type]
+        project_dir = self.get_project_path(project_name)
+
+        def _mutate(project):
+            bucket = project.get(spec.bucket_key)
+            if bucket is None or name not in bucket:
+                raise KeyError(f"{spec.label_zh} '{name}' 不存在")
+            entry = bucket[name]
+            sheet_path = entry.get(spec.sheet_field, "")
+            entry[spec.sheet_field] = ""
+            # 安全删除磁盘文件
+            if sheet_path:
+                file_path = project_dir / sheet_path
+                try:
+                    # safe path 校验：确保解析后的路径在项目目录内
+                    file_path.resolve().relative_to(project_dir.resolve())
+                except ValueError:
+                    # 路径逃逸，不删除
+                    return
+                file_path.unlink(missing_ok=True)
+
+        return self.update_project(project_name, _mutate)
+
+    def clear_character_sheet(self, project_name: str, name: str) -> dict:
+        """清空角色设计图字段并删除磁盘文件。"""
+        return self._clear_asset_sheet("character", project_name, name)
+
+    def clear_scene_sheet(self, project_name: str, name: str) -> dict:
+        """清空场景设计图字段并删除磁盘文件。"""
+        return self._clear_asset_sheet("scene", project_name, name)
+
+    def clear_prop_sheet(self, project_name: str, name: str) -> dict:
+        """清空道具设计图字段并删除磁盘文件。"""
+        return self._clear_asset_sheet("prop", project_name, name)
+
+    def clear_product_sheet(self, project_name: str, name: str) -> dict:
+        """清空产品设计图字段并删除磁盘文件。"""
+        return self._clear_asset_sheet("product", project_name, name)
+
+    def update_character_voice_reference(self, project_name: str, char_name: str, audio_path: str) -> dict:
+        """更新角色的声音参考音频路径。
+
+        Args:
+            project_name: 项目名称
+            char_name: 角色名称
+            audio_path: 音频相对路径（如 characters/voice_refs/凯尔.mp3）
+        """
+
+        def _mutate(project: dict) -> None:
+            if "characters" not in project or char_name not in project["characters"]:
+                raise KeyError(f"角色 '{char_name}' 不存在")
+            project["characters"][char_name]["voice_reference_audio"] = audio_path
+
+        return self.update_project(project_name, _mutate)
+
+    def clear_character_voice_reference(self, project_name: str, char_name: str) -> dict:
+        """清空角色的声音参考音频字段并安全删除磁盘文件。
+
+        角色不存在抛 KeyError；文件在项目目录外不删除；文件不存在不报错。
+        """
+        project_dir = self.get_project_path(project_name)
+
+        def _mutate(project: dict) -> None:
+            if "characters" not in project or char_name not in project["characters"]:
+                raise KeyError(f"角色 '{char_name}' 不存在")
+            entry = project["characters"][char_name]
+            audio_path = entry.get("voice_reference_audio", "")
+            entry["voice_reference_audio"] = ""
+            if audio_path:
+                file_path = project_dir / audio_path
+                try:
+                    file_path.resolve().relative_to(project_dir.resolve())
+                except ValueError:
+                    return
+                file_path.unlink(missing_ok=True)
+
+        return self.update_project(project_name, _mutate)
+
     def _get_asset(self, asset_type: str, project_name: str, name: str) -> dict:
         """获取资产定义。不存在抛 KeyError。"""
         spec = ASSET_SPECS[asset_type]

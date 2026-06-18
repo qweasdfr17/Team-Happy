@@ -5,6 +5,7 @@
     "claude-md-management@claude-plugins-official": true
   },
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(ls:*)",
       "Bash(uv run python -m pytest:*)",

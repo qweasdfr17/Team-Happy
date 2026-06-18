@@ -182,6 +182,28 @@ def build_asset_router(
             logger.exception("请求处理失败")
             raise HTTPException(status_code=500, detail=str(exc))
 
+    @router.delete(f"/projects/{{project_name}}/{spec.subdir}/{{entry_name}}/sheet")
+    async def delete_sheet(project_name: str, entry_name: str, _user: CurrentUser, _t: Translator):
+        """清空资产设计图字段并安全删除磁盘文件。"""
+        try:
+
+            def _sync():
+                manager = pm_getter()
+                with project_change_source("webui"):
+                    manager._clear_asset_sheet(asset_type, project_name, entry_name)
+                return {"success": True, "message": _t("sheet_deleted", name=entry_name)}
+
+            return await asyncio.to_thread(_sync)
+        except KeyError:
+            raise HTTPException(status_code=404, detail=_t(keys["not_found"], name=entry_name))
+        except FileNotFoundError:
+            raise HTTPException(status_code=404, detail=_t("project_not_found", name=project_name))
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception("请求处理失败")
+            raise HTTPException(status_code=500, detail=str(exc))
+
     @router.delete(f"/projects/{{project_name}}/{spec.subdir}/{{entry_name}}")
     async def delete_entry(project_name: str, entry_name: str, _user: CurrentUser, _t: Translator):
         try:

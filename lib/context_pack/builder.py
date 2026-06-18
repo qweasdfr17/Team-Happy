@@ -83,6 +83,8 @@ def build_context_pack(project: dict, script: dict, *, source_script: str = "") 
             "name": name,
             "aliases": [],
             "description": entry.get("description", ""),
+            "voice_style": entry.get("voice_style", ""),
+            "voice_reference_audio": entry.get("voice_reference_audio", ""),
             "referenced_shots": char_shot_map.get(name, []),
             "has_sheet": _has_sheet(characters, name, char_spec.sheet_field) if char_spec else False,
         })

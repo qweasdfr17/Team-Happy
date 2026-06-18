@@ -53,5 +53,13 @@ export default {
   "upload_sheet_short": "上传",
   "edit": "编辑",
   "delete": "删除",
+  "delete_sheet": "删除设计图",
+  "delete_sheet_confirm": "确定删除「{{name}}」的设计图？此操作不可撤销。",
+  "delete_sheet_success": "「{{name}}」设计图已删除",
+  "voice_reference": "声音参考",
+  "upload_voice_reference": "上传声音参考",
+  "replace_voice_reference": "更换声音参考",
+  "delete_voice_reference": "删除声音参考",
+  "delete_voice_confirm": "确定删除「{{name}}」的声音参考？",
   "meta_updated_at": "{{date}} 更新",
 } satisfies Record<keyof typeof enAssets, string>;

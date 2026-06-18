@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useId } from "react";
 import { useTranslation } from "react-i18next";
-import { Landmark, Upload } from "lucide-react";
+import { Landmark, Trash2, Upload } from "lucide-react";
 import { API } from "@/api";
 import { AddToLibraryButton } from "@/components/assets/AddToLibraryButton";
 import { VersionTimeMachine } from "@/components/canvas/timeline/VersionTimeMachine";
@@ -56,6 +56,7 @@ export function SceneCard({
   const [description, setDescription] = useState(scene.description);
   const [imgError, setImgError] = useState(false);
   const [uploadingSheet, setUploadingSheet] = useState(false);
+  const [deletingSheet, setDeletingSheet] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const sheetInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +73,21 @@ export function SceneCard({
       useAppStore.getState().pushToast(errMsg(err), "error");
     } finally {
       setUploadingSheet(false);
+    }
+  };
+
+  const handleDeleteSheet = async () => {
+    const confirmed = window.confirm(t("assets:delete_sheet_confirm", { name }));
+    if (!confirmed) return;
+    setDeletingSheet(true);
+    try {
+      await API.deleteSceneSheet(projectName, name);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:delete_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setDeletingSheet(false);
     }
   };
 
@@ -181,6 +197,19 @@ export function SceneCard({
             className="hidden"
             onChange={(e) => void handleSheetUpload(e)}
           />
+          {scene.scene_sheet && (
+            <button
+              type="button"
+              onClick={() => void handleDeleteSheet()}
+              disabled={deletingSheet}
+              title={t("assets:delete_sheet")}
+              aria-label={t("assets:delete_sheet")}
+              className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-40"
+              style={{ color: "var(--color-text-3)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           <AddToLibraryButton
             resourceType="scene"
             resourceId={name}

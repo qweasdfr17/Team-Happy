@@ -139,3 +139,325 @@ class TestAssetRouterFactory:
             assert "unknown" in str(e)
         else:
             raise AssertionError("should have raised ValueError")
+
+
+class _FakePMWithFiles:
+    """支持 _clear_asset_sheet / voice reference 的 FakePM。"""
+
+    def __init__(self, tmp_path):
+        import json
+
+        self.tmp_path = tmp_path
+        self.projects: dict[str, dict] = {}
+        self.project_dirs: dict[str, str] = {}
+
+    def _add_project(self, name: str):
+        import json
+
+        proj_dir = self.tmp_path / name
+        proj_dir.mkdir(parents=True, exist_ok=True)
+        (proj_dir / "project.json").write_text(json.dumps({"name": name, "characters": {}, "scenes": {}, "props": {}, "products": {}}))
+        self.project_dirs[name] = str(proj_dir)
+        self.projects[name] = {"name": name, "characters": {}, "scenes": {}, "props": {}, "products": {}}
+
+    def get_project_path(self, project_name: str):
+        from pathlib import Path
+
+        if project_name not in self.project_dirs:
+            raise FileNotFoundError(project_name)
+        return Path(self.project_dirs[project_name])
+
+    def load_project(self, project_name: str):
+        if project_name not in self.projects:
+            raise FileNotFoundError(project_name)
+        return self.projects[project_name]
+
+    def update_project(self, project_name: str, mutate_fn):
+        project = self.load_project(project_name)
+        mutate_fn(project)
+
+    def _clear_asset_sheet(self, asset_type: str, project_name: str, name: str):
+        from pathlib import Path
+        from lib.asset_types import ASSET_SPECS
+
+        spec = ASSET_SPECS[asset_type]
+        project = self.load_project(project_name)
+        proj_dir = Path(self.project_dirs[project_name])
+        bucket = project.get(spec.bucket_key, {})
+        if name not in bucket:
+            raise KeyError(name)
+        entry = bucket[name]
+        sheet_path = entry.get(spec.sheet_field, "")
+        entry[spec.sheet_field] = ""
+        if sheet_path:
+            file_path = proj_dir / sheet_path
+            try:
+                file_path.resolve().relative_to(proj_dir.resolve())
+            except ValueError:
+                return
+            file_path.unlink(missing_ok=True)
+
+    def update_character_voice_reference(self, project_name: str, char_name: str, audio_path: str):
+        project = self.load_project(project_name)
+        if "characters" not in project or char_name not in project["characters"]:
+            raise KeyError(char_name)
+        project["characters"][char_name]["voice_reference_audio"] = audio_path
+
+    def clear_character_voice_reference(self, project_name: str, char_name: str):
+        from pathlib import Path
+
+        project = self.load_project(project_name)
+        proj_dir = Path(self.project_dirs[project_name])
+        if "characters" not in project or char_name not in project["characters"]:
+            raise KeyError(char_name)
+        entry = project["characters"][char_name]
+        audio_path = entry.get("voice_reference_audio", "")
+        entry["voice_reference_audio"] = ""
+        if audio_path:
+            file_path = proj_dir / audio_path
+            try:
+                file_path.resolve().relative_to(proj_dir.resolve())
+            except ValueError:
+                return
+            file_path.unlink(missing_ok=True)
+
+
+def _full_client(monkeypatch, tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from server.auth import CurrentUserInfo, get_current_user
+    from server.routers import characters, products, props, scenes
+
+    fake_pm = _FakePMWithFiles(tmp_path)
+    fake_pm._add_project("demo")
+    # Add test entries
+    fake_pm.projects["demo"]["characters"]["Alice"] = {
+        "description": "hero",
+        "character_sheet": "characters/Alice.png",
+        "voice_style": "calm",
+        "reference_image": "",
+        "voice_reference_audio": "",
+    }
+    fake_pm.projects["demo"]["scenes"]["Park"] = {
+        "description": "park",
+        "scene_sheet": "scenes/Park.png",
+    }
+    fake_pm.projects["demo"]["props"]["Sword"] = {
+        "description": "sword",
+        "prop_sheet": "props/Sword.png",
+    }
+    fake_pm.projects["demo"]["products"]["Widget"] = {
+        "description": "widget",
+        "product_sheet": "products/Widget.png",
+        "brand": "",
+        "reference_images": [],
+        "selling_points": [],
+    }
+
+    # Create dummy sheet files on disk
+    for rel_path in ("characters/Alice.png", "scenes/Park.png", "props/Sword.png", "products/Widget.png"):
+        abs_path = tmp_path / "demo" / rel_path
+        abs_path.parent.mkdir(parents=True, exist_ok=True)
+        abs_path.write_text("dummy")
+
+    monkeypatch.setattr(characters, "get_project_manager", lambda: fake_pm)
+    monkeypatch.setattr(scenes, "get_project_manager", lambda: fake_pm)
+    monkeypatch.setattr(props, "get_project_manager", lambda: fake_pm)
+    monkeypatch.setattr(products, "get_project_manager", lambda: fake_pm)
+
+    app = FastAPI()
+    app.dependency_overrides[get_current_user] = lambda: CurrentUserInfo(id="default", sub="testuser", role="admin")
+    app.include_router(characters.router, prefix="/api/v1")
+    app.include_router(scenes.router, prefix="/api/v1")
+    app.include_router(props.router, prefix="/api/v1")
+    app.include_router(products.router, prefix="/api/v1")
+    return TestClient(app), fake_pm
+
+
+class TestDeleteSheet:
+    """测试 DELETE /projects/{name}/{subdir}/{entry}/sheet 端点。"""
+
+    def test_delete_character_sheet_clears_field_and_deletes_file(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        proj_dir = tmp_path / "demo"
+        sheet_file = proj_dir / "characters" / "Alice.png"
+        assert sheet_file.exists()
+        assert pm.projects["demo"]["characters"]["Alice"]["character_sheet"] == "characters/Alice.png"
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/sheet")
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+        assert pm.projects["demo"]["characters"]["Alice"]["character_sheet"] == ""
+        assert not sheet_file.exists()
+        # description / voice_style not affected
+        assert pm.projects["demo"]["characters"]["Alice"]["description"] == "hero"
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_style"] == "calm"
+
+    def test_delete_scene_sheet(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        proj_dir = tmp_path / "demo"
+        sheet_file = proj_dir / "scenes" / "Park.png"
+        assert sheet_file.exists()
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/scenes/Park/sheet")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["scenes"]["Park"]["scene_sheet"] == ""
+        assert not sheet_file.exists()
+
+    def test_delete_prop_sheet(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.delete("/api/v1/projects/demo/props/Sword/sheet")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["props"]["Sword"]["prop_sheet"] == ""
+
+    def test_delete_product_sheet(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.delete("/api/v1/projects/demo/products/Widget/sheet")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["products"]["Widget"]["product_sheet"] == ""
+
+    def test_delete_nonexistent_file_not_error(self, monkeypatch, tmp_path):
+        """文件已被手动删除时，字段清空不报错。"""
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # Simulate: sheet field set but file already gone
+        pm.projects["demo"]["characters"]["Alice"]["character_sheet"] = "characters/Alice.png"
+        sheet_file = tmp_path / "demo" / "characters" / "Alice.png"
+        sheet_file.unlink(missing_ok=True)
+        assert not sheet_file.exists()
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/sheet")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["character_sheet"] == ""
+
+    def test_delete_sheet_404_on_missing_asset(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/NotExist/sheet")
+        assert resp.status_code == 404
+
+    def test_delete_sheet_safe_path_no_escape(self, monkeypatch, tmp_path):
+        """路径逃逸文件不会被删除。"""
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # Set sheet to path that tries to escape project dir
+        pm.projects["demo"]["characters"]["Alice"]["character_sheet"] = "../outside/file.png"
+        # Create a file outside the project
+        outside = tmp_path / "outside" / "file.png"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_text("outside")
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/sheet")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["character_sheet"] == ""
+        assert outside.exists()  # 不应该被删除
+
+
+class TestVoiceReference:
+    """测试角色声音参考上传/删除端点。"""
+
+    def test_upload_voice_reference_saves_file_and_updates_field(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/voice-reference",
+                files={"file": ("voice.mp3", b"fake-mp3-data", "audio/mpeg")},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        assert data["path"] == "characters/voice_refs/Alice.mp3"
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == "characters/voice_refs/Alice.mp3"
+        assert (tmp_path / "demo" / "characters" / "voice_refs" / "Alice.mp3").exists()
+
+    def test_upload_voice_reference_replaces_old(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # First upload
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/voice-reference",
+                files={"file": ("old.wav", b"old-data", "audio/wav")},
+            )
+        assert resp.status_code == 200
+        old_path = tmp_path / "demo" / "characters" / "voice_refs" / "Alice.wav"
+        assert old_path.exists()
+
+        # Replace with new format
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/voice-reference",
+                files={"file": ("new.mp3", b"new-data", "audio/mpeg")},
+            )
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == "characters/voice_refs/Alice.mp3"
+        assert not old_path.exists()  # old file deleted
+        assert (tmp_path / "demo" / "characters" / "voice_refs" / "Alice.mp3").exists()
+
+    def test_delete_voice_reference(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # Set up voice reference
+        pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] = "characters/voice_refs/Alice.mp3"
+        audio_dir = tmp_path / "demo" / "characters" / "voice_refs"
+        audio_dir.mkdir(parents=True, exist_ok=True)
+        audio_file = audio_dir / "Alice.mp3"
+        audio_file.write_text("audio data")
+        assert audio_file.exists()
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/voice-reference")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == ""
+        assert not audio_file.exists()
+
+    def test_delete_voice_reference_404_on_missing_character(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/NotExist/voice-reference")
+        assert resp.status_code == 404
+
+    def test_upload_voice_reference_rejects_non_audio(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/voice-reference",
+                files={"file": ("image.png", b"not-audio", "image/png")},
+            )
+        assert resp.status_code == 400
+
+    def test_upload_voice_reference_404_missing_character(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/NotExist/voice-reference",
+                files={"file": ("voice.mp3", b"data", "audio/mpeg")},
+            )
+        assert resp.status_code == 404
+
+    def test_delete_voice_reference_no_file_not_error(self, monkeypatch, tmp_path):
+        """文件不存在时清空字段不报错。"""
+        client, pm = _full_client(monkeypatch, tmp_path)
+        pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] = "characters/voice_refs/ghost.mp3"
+        # File doesn't exist on disk
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/voice-reference")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == ""
+
+    def test_voice_reference_safe_path_no_escape(self, monkeypatch, tmp_path):
+        """路径逃逸文件不会被删除。"""
+        client, pm = _full_client(monkeypatch, tmp_path)
+        pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] = "../outside/evil.mp3"
+        outside = tmp_path / "outside" / "evil.mp3"
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_text("malicious")
+
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/voice-reference")
+        assert resp.status_code == 200
+        assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == ""
+        assert outside.exists()  # 不应该被删除

@@ -252,3 +252,45 @@ class TestSourceScript:
         pack = build_context_pack(project, {"shots": shots}, source_script="scripts/episode_1.json")
         assert pack["source_script"] == "scripts/episode_1.json"
         assert pack["shot_intent_map"][0]["shot_id"] == "E1S01"
+
+
+class TestVoiceReferenceInContextPack:
+    """voice_reference_audio / voice_style 进入 context pack 角色数据。"""
+
+    def test_voice_fields_in_character_entry(self):
+        project = _project()
+        project["characters"]["女主"]["voice_style"] = "温柔御姐"
+        project["characters"]["女主"]["voice_reference_audio"] = "characters/voice_refs/女主.mp3"
+        shots = [_ad_shot("E1S01")]
+        pack = build_context_pack(project, {"shots": shots})
+        chars = pack["characters_with_aliases"]
+        char_entry = next(c for c in chars if c["name"] == "女主")
+        assert char_entry["voice_style"] == "温柔御姐"
+        assert char_entry["voice_reference_audio"] == "characters/voice_refs/女主.mp3"
+
+    def test_voice_fields_default_empty(self):
+        """无 voice 字段的老项目仍兼容——字段默认空字符串。"""
+        project = _project()
+        shots = [_ad_shot("E1S01")]
+        pack = build_context_pack(project, {"shots": shots})
+        chars = pack["characters_with_aliases"]
+        char_entry = next(c for c in chars if c["name"] == "女主")
+        assert char_entry["voice_style"] == ""
+        assert char_entry["voice_reference_audio"] == ""
+
+    def test_voice_reference_not_lost_in_full_pack(self):
+        """完整 context pack 生成不丢弃 voice 字段。"""
+        project = _project()
+        project["characters"]["女主"]["voice_style"] = "少年音"
+        project["characters"]["女主"]["voice_reference_audio"] = "characters/voice_refs/女主.wav"
+        shots = [_ad_shot("E1S01", characters_in_shot=["女主"], scenes=["古庙"])]
+        pack = build_context_pack(project, {"shots": shots}, source_script="ep1.json")
+        chars = pack["characters_with_aliases"]
+        char_entry = next(c for c in chars if c["name"] == "女主")
+        assert char_entry["voice_style"] == "少年音"
+        assert char_entry["voice_reference_audio"] == "characters/voice_refs/女主.wav"
+        assert char_entry["has_sheet"] is True
+        assert char_entry["description"] == "年轻女子，长发，神情坚毅"
+        # 参考图应在 state 中正确
+        state = pack["asset_reference_state"]
+        assert len(state["assets_without_sheet"]) == 0

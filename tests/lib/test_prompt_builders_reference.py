@@ -163,3 +163,51 @@ def test_build_reference_video_prompt_injects_episode_constraints():
     assert "第 3 集" in prompt
     assert "E3U" in prompt
     assert "<episode_constraints>" in prompt
+
+
+def test_voice_reference_in_character_section():
+    """角色有 voice_reference_audio 时，prompt 的 <characters> 段包含声音参考。"""
+    prompt = build_reference_video_prompt(
+        project_overview={"synopsis": "s", "genre": "g", "theme": "t", "world_setting": "w"},
+        style="s",
+        style_description="d",
+        characters={
+            "主角": {
+                "description": "少年剑客",
+                "voice_style": "清亮少年音",
+                "voice_reference_audio": "characters/voice_refs/主角.mp3",
+            },
+        },
+        scenes={},
+        props={},
+        units_md="stub",
+        supported_durations=[8],
+        max_refs=9,
+        episode=1,
+    )
+    # 声音参考信息应出现在 <characters> 段
+    assert "声音参考" in prompt
+    assert "characters/voice_refs/主角.mp3" in prompt
+    assert "配音风格: 清亮少年音" in prompt
+
+
+def test_no_voice_reference_still_compatible():
+    """无 voice 字段的老角色仍然兼容——<characters> 段不出错。"""
+    prompt = build_reference_video_prompt(
+        project_overview={"synopsis": "s", "genre": "g", "theme": "t", "world_setting": "w"},
+        style="s",
+        style_description="d",
+        characters={"老角色": {"description": "旧数据"}},
+        scenes={},
+        props={},
+        units_md="stub",
+        supported_durations=[8],
+        max_refs=9,
+        episode=1,
+    )
+    # 老角色正常出现在 prompt 中，voice 相关字段为空即不展示
+    assert "老角色" in prompt
+    assert "旧数据" in prompt
+    # 不应包含 voice 相关标记
+    assert "声音参考" not in prompt
+    assert "配音风格" not in prompt

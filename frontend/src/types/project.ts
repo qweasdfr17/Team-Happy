@@ -20,6 +20,8 @@ export interface Character {
   character_sheet?: string;
   voice_style?: string;
   reference_image?: string;
+  /** 用户上传的配音参考音频路径（项目内角色独有字段）。 */
+  voice_reference_audio?: string;
 }
 
 export interface Scene {

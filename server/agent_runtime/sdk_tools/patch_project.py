@@ -64,7 +64,11 @@ def patch_project_tool(ctx: ToolContext):
                 },
                 "entries": {
                     "type": "object",
-                    "description": "(资产 upsert 分支){ 名称: { description, voice_style 等字段 } } 映射;至少一条",
+                    "description": (
+                        "(资产 upsert 分支){ 名称: { description, voice_style 等字段 } } 映射;至少一条。"
+                        "角色可编辑 description 与 voice_style；"
+                        "voice_reference_audio / reference_image / character_sheet 为系统管理字段,不可手动设置"
+                    ),
                 },
                 "settings": {
                     "type": "object",
@@ -300,7 +304,7 @@ def _format_upsert_result(table: str, result: dict[str, Any]) -> str:
     if dropped_fields:
         detail = "; ".join(f"{name}: {', '.join(fields)}" for name, fields in sorted(dropped_fields.items()))
         lines.append(f"⚠️  以下字段不在 agent 可编辑范围,已忽略 → {detail}")
-        lines.append("   说明: reference_image 由用户上传/系统管理;")
+        lines.append("   说明: reference_image / voice_reference_audio 由用户上传/系统管理;")
         lines.append("   character_sheet / scene_sheet / prop_sheet 由资产生成流水线回写,不可手动设置。")
     if dropped_legacy:
         detail = "; ".join(f"{name}: {', '.join(fields)}" for name, fields in sorted(dropped_legacy.items()))

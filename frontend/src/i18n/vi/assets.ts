@@ -53,5 +53,13 @@ export default {
   "upload_sheet_short": "Tải lên",
   "edit": "Chỉnh sửa",
   "delete": "Xóa",
+  "delete_sheet": "Xóa thiết kế",
+  "delete_sheet_confirm": "Xóa bảng thiết kế của \"{{name}}\"? Không thể hoàn tác.",
+  "delete_sheet_success": "Đã xóa bảng thiết kế của \"{{name}}\"",
+  "voice_reference": "Giọng đọc tham khảo",
+  "upload_voice_reference": "Tải lên giọng đọc tham khảo",
+  "replace_voice_reference": "Thay giọng đọc tham khảo",
+  "delete_voice_reference": "Xóa giọng đọc tham khảo",
+  "delete_voice_confirm": "Xóa giọng đọc tham khảo của \"{{name}}\"?",
   "meta_updated_at": "Cập nhật {{date}}",
 } satisfies Record<keyof typeof enAssets, string>;

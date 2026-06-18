@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ImagePlus, Upload, User } from "lucide-react";
+import { AudioLines, ImagePlus, Trash2, Upload, User } from "lucide-react";
 import { API } from "@/api";
 import { AddToLibraryButton } from "@/components/assets/AddToLibraryButton";
 import { VersionTimeMachine } from "@/components/canvas/timeline/VersionTimeMachine";
@@ -62,9 +62,14 @@ export function CharacterCard({
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingSheet, setUploadingSheet] = useState(false);
+  const [deletingSheet, setDeletingSheet] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [uploadingVoice, setUploadingVoice] = useState(false);
+  const [deletingVoice, setDeletingVoice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sheetInputRef = useRef<HTMLInputElement>(null);
+  const voiceInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const descId = useId();
   const voiceId = useId();
@@ -82,6 +87,52 @@ export function CharacterCard({
       useAppStore.getState().pushToast(errMsg(err), "error");
     } finally {
       setUploadingSheet(false);
+    }
+  };
+
+  const handleDeleteSheet = async () => {
+    const confirmed = window.confirm(t("assets:delete_sheet_confirm", { name }));
+    if (!confirmed) return;
+    setDeletingSheet(true);
+    try {
+      await API.deleteCharacterSheet(projectName, name);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:delete_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setDeletingSheet(false);
+    }
+  };
+
+  const handleVoiceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploadingVoice(true);
+    try {
+      await API.uploadCharacterVoiceReference(projectName, name, file);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:upload_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setUploadingVoice(false);
+    }
+  };
+
+  const handleDeleteVoice = async () => {
+    const confirmed = window.confirm(t("assets:delete_voice_confirm", { name }));
+    if (!confirmed) return;
+    setDeletingVoice(true);
+    try {
+      await API.deleteCharacterVoiceReference(projectName, name);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:delete_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setDeletingVoice(false);
     }
   };
 
@@ -177,6 +228,10 @@ export function CharacterCard({
     ? API.getFileUrl(projectName, character.reference_image, referenceFp)
     : null;
 
+  const voiceUrl = character.voice_reference_audio
+    ? API.getFileUrl(projectName, character.voice_reference_audio)
+    : null;
+
   const displayedReferenceUrl = referencePreview ?? savedReferenceUrl;
   const hasSavedReference = Boolean(savedReferenceUrl) && !referencePreview;
 
@@ -250,6 +305,19 @@ export function CharacterCard({
             className="hidden"
             onChange={(e) => void handleSheetUpload(e)}
           />
+          {character.character_sheet && (
+            <button
+              type="button"
+              onClick={() => void handleDeleteSheet()}
+              disabled={deletingSheet}
+              title={t("assets:delete_sheet")}
+              aria-label={t("assets:delete_sheet")}
+              className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-40"
+              style={{ color: "var(--color-text-3)" }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           <AddToLibraryButton
             resourceType="character"
             resourceId={name}
@@ -384,6 +452,73 @@ export function CharacterCard({
             className="hidden"
           />
         </div>
+      </div>
+
+      {/* ---- Voice reference ---- */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between">
+          <CapsLabel>{t("assets:voice_reference")}</CapsLabel>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => voiceInputRef.current?.click()}
+              disabled={uploadingVoice}
+              title={
+                character.voice_reference_audio
+                  ? t("assets:replace_voice_reference")
+                  : t("assets:upload_voice_reference")
+              }
+              aria-label={
+                character.voice_reference_audio
+                  ? t("assets:replace_voice_reference")
+                  : t("assets:upload_voice_reference")
+              }
+              className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-40"
+              style={{ color: "var(--color-text-3)" }}
+            >
+              <AudioLines className="h-3.5 w-3.5" />
+            </button>
+            <input
+              ref={voiceInputRef}
+              type="file"
+              accept=".mp3,.wav,.m4a,.aac,.ogg,.flac"
+              aria-label={t("assets:upload_voice_reference")}
+              className="hidden"
+              onChange={(e) => void handleVoiceUpload(e)}
+            />
+            {character.voice_reference_audio && (
+              <button
+                type="button"
+                onClick={() => void handleDeleteVoice()}
+                disabled={deletingVoice}
+                title={t("assets:delete_voice_reference")}
+                aria-label={t("assets:delete_voice_reference")}
+                className="focus-ring inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors hover:bg-[oklch(1_0_0_/_0.05)] disabled:opacity-40"
+                style={{ color: "var(--color-text-3)" }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+        {voiceUrl ? (
+          <div className="mt-1.5">
+            <audio controls className="w-full" style={{ height: 32 }}>
+              <source src={voiceUrl} />
+            </audio>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => voiceInputRef.current?.click()}
+            disabled={uploadingVoice}
+            className="focus-ring mt-1.5 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--color-hairline)] px-3 py-3 text-[12px] transition-colors hover:border-[var(--color-accent-soft)]"
+            style={{ color: "var(--color-text-4)" }}
+          >
+            <AudioLines className="h-3.5 w-3.5" />
+            {t("assets:upload_voice_reference")}
+          </button>
+        )}
       </div>
 
       <CapsLabel htmlFor={descId}>{t("description")}</CapsLabel>

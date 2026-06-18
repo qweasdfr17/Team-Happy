@@ -11,11 +11,29 @@ from __future__ import annotations
 
 
 def _format_asset_names(assets: dict | None) -> str:
+    """格式化资产列表为 prompt 可读文本。
+
+    对角色类型额外展示 voice_style / voice_reference_audio（若存在），
+    供 agent 在生成配音/视频提示词时感知。
+    """
     if not assets:
         return "（无）"
-    return "\n".join(
-        f"- {name}: {meta.get('description', '') if isinstance(meta, dict) else ''}" for name, meta in assets.items()
-    )
+    lines: list[str] = []
+    for name, meta in assets.items():
+        desc = meta.get("description", "") if isinstance(meta, dict) else ""
+        line = f"- {name}: {desc}"
+        if isinstance(meta, dict):
+            voice_style = meta.get("voice_style", "")
+            voice_ref = meta.get("voice_reference_audio", "")
+            extras: list[str] = []
+            if voice_style:
+                extras.append(f"配音风格: {voice_style}")
+            if voice_ref:
+                extras.append(f"声音参考: {voice_ref}")
+            if extras:
+                line += "（" + "；".join(extras) + "）"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def build_reference_video_prompt(

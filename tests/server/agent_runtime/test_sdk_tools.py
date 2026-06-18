@@ -1370,6 +1370,96 @@ async def test_patch_reference_video_unit_prompt_infers_ad_references(
     ]
 
 
+async def test_patch_reference_video_unit_prompt_infers_narration_references(
+    fake_ctx: ToolContext,
+) -> None:
+    """narration/drama video_units：agent 省略 references 时自动从 prompt 推断。"""
+    from contextlib import contextmanager
+
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = fake_ctx.pm
+    character_name = next(iter(pm.project_payload["characters"]))  # type: ignore[attr-defined]
+    scene_name = next(iter(pm.project_payload["scenes"]))  # type: ignore[attr-defined]
+    pm.script_payload["video_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shots": [{"text": "old shot", "duration": 5}],
+            "duration_seconds": 5,
+            "references": [],
+        }
+    ]
+
+    @contextmanager
+    def _locked(_name: str, _filename: str, **_kw: Any):
+        yield pm.script_payload  # type: ignore[attr-defined]
+
+    pm.locked_script = _locked  # type: ignore[attr-defined]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(fake_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            # 精品提示词中含有图片声明，但 agent 未传 references 参数
+            "prompt": f"图片1：角色参考图 — {character_name}\n图片2：场景参考图 — {scene_name}\n精品提示词正文内容",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    unit = pm.script_payload["video_units"][0]  # type: ignore[attr-defined]
+    # references 从 prompt 文本中的"图片1：角色参考图 — 张三"推断写入
+    assert unit["references"] == [
+        {"type": "character", "name": character_name},
+        {"type": "scene", "name": scene_name},
+    ]
+    # parse_prompt 保留完整 prompt 文本（含图片声明行）
+    assert "精品提示词正文内容" in unit["shots"][0]["text"]
+
+
+async def test_patch_reference_video_unit_prompt_no_match_keeps_original_refs(
+    fake_ctx: ToolContext,
+) -> None:
+    """prompt 中没有匹配资产时保留原有 references，不报错。"""
+    from contextlib import contextmanager
+
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = fake_ctx.pm
+    original_refs = [{"type": "character", "name": "张三"}]
+    pm.script_payload["video_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shots": [{"text": "old shot", "duration": 5}],
+            "duration_seconds": 5,
+            "references": original_refs,
+        }
+    ]
+
+    @contextmanager
+    def _locked(_name: str, _filename: str, **_kw: Any):
+        yield pm.script_payload  # type: ignore[attr-defined]
+
+    pm.locked_script = _locked  # type: ignore[attr-defined]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(fake_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            # 提示词中不含任何可匹配资产名
+            "prompt": "精品提示词，未提及任何角色/场景/道具名称",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    unit = pm.script_payload["video_units"][0]  # type: ignore[attr-defined]
+    # 推断无结果时保留原有 references
+    assert unit["references"] == original_refs
+
+
 async def test_generate_video_episode_ad_reference_uses_prompt_override(
     ad_reference_ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

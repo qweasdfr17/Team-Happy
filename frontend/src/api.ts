@@ -588,6 +588,41 @@ class API {
     );
   }
 
+  static async deleteCharacterSheet(
+    projectName: string,
+    charName: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/sheet`,
+      { method: "DELETE" }
+    );
+  }
+
+  static async uploadCharacterVoiceReference(
+    projectName: string,
+    charName: string,
+    file: File
+  ): Promise<{ success: boolean; path: string; url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(
+      `${API_BASE}/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/voice-reference`,
+      withAuth({ method: "POST", body: formData })
+    );
+    await throwIfNotOk(response, "上传声音参考失败");
+    return (await response.json()) as { success: boolean; path: string; url: string };
+  }
+
+  static async deleteCharacterVoiceReference(
+    projectName: string,
+    charName: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/voice-reference`,
+      { method: "DELETE" }
+    );
+  }
+
   // ==================== 项目场景管理 ====================
 
   static async addProjectScene(
@@ -627,6 +662,16 @@ class API {
       {
         method: "DELETE",
       }
+    );
+  }
+
+  static async deleteSceneSheet(
+    projectName: string,
+    sceneName: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/scenes/${encodeURIComponent(sceneName)}/sheet`,
+      { method: "DELETE" }
     );
   }
 
@@ -672,6 +717,16 @@ class API {
     );
   }
 
+  static async deletePropSheet(
+    projectName: string,
+    propName: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/props/${encodeURIComponent(propName)}/sheet`,
+      { method: "DELETE" }
+    );
+  }
+
   // ==================== 项目产品管理 ====================
 
   static async addProjectProduct(
@@ -712,6 +767,16 @@ class API {
       {
         method: "DELETE",
       }
+    );
+  }
+
+  static async deleteProductSheet(
+    projectName: string,
+    productName: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/products/${encodeURIComponent(productName)}/sheet`,
+      { method: "DELETE" }
     );
   }
 

@@ -51,5 +51,13 @@ export default {
   "upload_sheet_short": "Upload",
   "edit": "Edit",
   "delete": "Delete",
+  "delete_sheet": "Delete Design",
+  "delete_sheet_confirm": "Delete the design sheet of \"{{name}}\"? This cannot be undone.",
+  "delete_sheet_success": "Design sheet of \"{{name}}\" deleted",
+  "voice_reference": "Voice Reference",
+  "upload_voice_reference": "Upload voice reference",
+  "replace_voice_reference": "Replace voice reference",
+  "delete_voice_reference": "Delete voice reference",
+  "delete_voice_confirm": "Delete the voice reference of \"{{name}}\"?",
   "meta_updated_at": "Updated {{date}}",
 };
