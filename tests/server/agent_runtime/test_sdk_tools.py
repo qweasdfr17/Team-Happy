@@ -92,6 +92,10 @@ class _FakePM:
     def get_pending_project_products(self, _name: str) -> list[dict[str, Any]]:
         return [{"name": "保温杯", "description": "不锈钢保温杯"}]
 
+    def update_project(self, _name: str, mutate):
+        """Apply a mutation function to the in-memory project payload."""
+        mutate(self.project_payload)
+
 
 @pytest.fixture
 def fake_ctx(tmp_path: Path) -> ToolContext:
@@ -1641,3 +1645,176 @@ async def test_generate_video_selected_not_confirmed_returns_prompt(fake_ctx):
     assert out.get("is_error") is not True
     text = out.get("content", [{}])[0].get("text", "")
     assert "确认" in text
+
+
+# ---------------------------------------------------------------------------
+# character_variants MCP tools
+# ---------------------------------------------------------------------------
+
+
+class TestCreateCharacterVariant:
+    async def test_creates_variant(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import create_character_variant_tool
+
+        tool_obj = create_character_variant_tool(fake_ctx)
+        out = await _call(tool_obj, {
+            "character_name": "张三",
+            "label": "少年时期",
+            "description": "十五六岁",
+        })
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "已为角色" in text
+        assert "少年时期" in text
+
+        # 验证 project payload
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        assert len(variants) == 1
+        assert variants[0]["label"] == "少年时期"
+        assert variants[0]["description"] == "十五六岁"
+        assert variants[0]["character_sheet"] == ""
+
+    async def test_duplicate_label_skips(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import create_character_variant_tool
+
+        tool_obj = create_character_variant_tool(fake_ctx)
+        # 第一次
+        await _call(tool_obj, {"character_name": "张三", "label": "战损装"})
+        # 第二次同 label
+        out = await _call(tool_obj, {"character_name": "张三", "label": "战损装"})
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "已存在变体" in text
+
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        assert len(variants) == 1  # 不重复创建
+
+    async def test_missing_character_errors(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import create_character_variant_tool
+
+        tool_obj = create_character_variant_tool(fake_ctx)
+        out = await _call(tool_obj, {"character_name": "不存在", "label": "少年"})
+        assert out.get("is_error") is True
+
+    async def test_stable_id_from_known_label(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import create_character_variant_tool
+
+        tool_obj = create_character_variant_tool(fake_ctx)
+        await _call(tool_obj, {"character_name": "张三", "label": "少年时期"})
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        assert variants[0]["id"] == "variant_young"
+
+    async def test_costume_reference_ids_passed(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import create_character_variant_tool
+
+        tool_obj = create_character_variant_tool(fake_ctx)
+        out = await _call(tool_obj, {
+            "character_name": "张三",
+            "label": "王爷装",
+            "costume_reference_ids": ["costume_001", "costume_002"],
+        })
+        assert out.get("is_error") is not True, out
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        assert variants[0]["costume_reference_ids"] == ["costume_001", "costume_002"]
+
+
+class TestUpdateCharacterVariant:
+    async def test_updates_description_and_costume_ids(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import (
+            create_character_variant_tool,
+            update_character_variant_tool,
+        )
+
+        create_tool = create_character_variant_tool(fake_ctx)
+        await _call(create_tool, {"character_name": "张三", "label": "成年时期", "description": "旧描述"})
+
+        update_tool = update_character_variant_tool(fake_ctx)
+        out = await _call(update_tool, {
+            "character_name": "张三",
+            "label": "成年时期",
+            "description": "二十五岁左右",
+            "costume_reference_ids": ["c1"],
+        })
+        assert out.get("is_error") is not True, out
+
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        assert variants[0]["description"] == "二十五岁左右"
+        assert variants[0]["costume_reference_ids"] == ["c1"]
+
+    async def test_update_by_variant_id(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import (
+            create_character_variant_tool,
+            update_character_variant_tool,
+        )
+
+        create_tool = create_character_variant_tool(fake_ctx)
+        await _call(create_tool, {"character_name": "张三", "label": "老年时期"})
+
+        variants = fake_ctx.pm.project_payload["characters"]["张三"].get("variants", [])
+        vid = variants[0]["id"]
+
+        update_tool = update_character_variant_tool(fake_ctx)
+        out = await _call(update_tool, {
+            "character_name": "张三",
+            "variant_id": vid,
+            "new_label": "晚年时期",
+        })
+        assert out.get("is_error") is not True, out
+        assert variants[0]["label"] == "晚年时期"
+
+    async def test_variant_not_found_errors(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import update_character_variant_tool
+
+        tool_obj = update_character_variant_tool(fake_ctx)
+        out = await _call(tool_obj, {
+            "character_name": "张三",
+            "variant_id": "nonexistent",
+            "description": "x",
+        })
+        assert out.get("is_error") is True
+
+
+class TestListCharacterVariants:
+    async def test_lists_all_variants(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import (
+            create_character_variant_tool,
+            list_character_variants_tool,
+        )
+
+        create_tool = create_character_variant_tool(fake_ctx)
+        await _call(create_tool, {"character_name": "张三", "label": "少年时期"})
+        await _call(create_tool, {"character_name": "李四", "label": "成年时期"})
+
+        list_tool = list_character_variants_tool(fake_ctx)
+        out = await _call(list_tool, {})
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "少年时期" in text
+        assert "成年时期" in text
+
+    async def test_filters_by_character(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import (
+            create_character_variant_tool,
+            list_character_variants_tool,
+        )
+
+        create_tool = create_character_variant_tool(fake_ctx)
+        await _call(create_tool, {"character_name": "张三", "label": "少年时期"})
+
+        list_tool = list_character_variants_tool(fake_ctx)
+        out = await _call(list_tool, {"character_name": "张三"})
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "少年时期" in text
+
+        # 查不存在的角色
+        out = await _call(list_tool, {"character_name": "不存在"})
+        assert out.get("is_error") is True
+
+    async def test_no_variants_shows_info(self, fake_ctx: ToolContext):
+        from server.agent_runtime.sdk_tools.character_variants import list_character_variants_tool
+
+        list_tool = list_character_variants_tool(fake_ctx)
+        out = await _call(list_tool, {})
+        assert out.get("is_error") is not True, out
+        text = out.get("content", [{}])[0].get("text", "")
+        assert "没有找到" in text or "没有" in text

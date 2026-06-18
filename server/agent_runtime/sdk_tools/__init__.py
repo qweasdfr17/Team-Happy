@@ -17,6 +17,11 @@ from typing import Any
 from claude_agent_sdk import create_sdk_mcp_server
 
 from server.agent_runtime.sdk_tools._context import ToolContext
+from server.agent_runtime.sdk_tools.character_variants import (
+    create_character_variant_tool,
+    list_character_variants_tool,
+    update_character_variant_tool,
+)
 from server.agent_runtime.sdk_tools.enqueue_assets import (
     generate_assets_tool,
     list_pending_assets_tool,
@@ -80,6 +85,9 @@ ARCREEL_MCP_TOOL_IDS: tuple[str, ...] = (
     "remove_segment",
     "split_segment",
     "patch_project",
+    "create_character_variant",
+    "update_character_variant",
+    "list_character_variants",
 )
 
 
@@ -111,5 +119,8 @@ def build_arcreel_mcp_server(*, project_name: str, projects_root: Path) -> Any:
             remove_segment_tool(ctx),
             split_segment_tool(ctx),
             patch_project_tool(ctx),
+            create_character_variant_tool(ctx),
+            update_character_variant_tool(ctx),
+            list_character_variants_tool(ctx),
         ],
     )

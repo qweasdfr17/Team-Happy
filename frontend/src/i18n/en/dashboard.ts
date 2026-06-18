@@ -1157,6 +1157,9 @@ export default {
   'tool_name_remove_segment': 'Remove shot',
   'tool_name_split_segment': 'Split shot',
   'tool_name_patch_project': 'Edit project assets',
+  'tool_name_create_character_variant': 'Create character variant',
+  'tool_name_update_character_variant': 'Update character variant',
+  'tool_name_list_character_variants': 'List character variants',
   // Skill display names (single source of truth: user-invocable SKILL.md files
   // under agent_runtime_profile/.claude/skills/; tests/test_frontend_skill_i18n.py enforces parity)
   'skill_name_manga_workflow': 'Video workflow',

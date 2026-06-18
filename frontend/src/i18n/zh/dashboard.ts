@@ -1158,6 +1158,9 @@ export default {
   'tool_name_remove_segment': '删除分镜',
   'tool_name_split_segment': '拆分分镜',
   'tool_name_patch_project': '编辑项目资产',
+  'tool_name_create_character_variant': '创建角色变体',
+  'tool_name_update_character_variant': '更新角色变体',
+  'tool_name_list_character_variants': '列出角色变体',
   // Skill display names (single source of truth: agent_runtime_profile/.claude/skills/*/SKILL.md
   // 中 user-invocable: true 的 skill；tests/test_frontend_skill_i18n.py 校验三语齐全)
   'skill_name_manga_workflow': '视频工作流',
