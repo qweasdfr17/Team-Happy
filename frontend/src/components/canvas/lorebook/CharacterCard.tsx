@@ -521,6 +521,24 @@ export function CharacterCard({
         )}
       </div>
 
+      {/* ---- Costume references ---- */}
+      <CostumeSection
+        name={name}
+        character={character}
+        projectName={projectName}
+        onReload={onReload}
+        t={t}
+      />
+
+      {/* ---- Character variants ---- */}
+      <VariantSection
+        name={name}
+        character={character}
+        projectName={projectName}
+        onReload={onReload}
+        t={t}
+      />
+
       <CapsLabel htmlFor={descId}>{t("description")}</CapsLabel>
       <textarea
         ref={textareaRef}
@@ -596,5 +614,309 @@ function CapsLabel({
     >
       {children}
     </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Costume section
+// ---------------------------------------------------------------------------
+
+function CostumeSection({
+  name,
+  character,
+  projectName,
+  onReload,
+  t,
+}: {
+  name: string;
+  character: Character;
+  projectName: string;
+  onReload?: () => Promise<unknown> | void;
+  t: (key: string, vars?: Record<string, string>) => string;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [label, setLabel] = useState("");
+  const [desc, setDesc] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  const costumes = character.costume_references ?? [];
+
+  const handleUpload = async () => {
+    if (!pendingFile || !label.trim()) return;
+    setUploading(true);
+    try {
+      await API.uploadCharacterCostume(projectName, name, pendingFile, label.trim(), desc.trim());
+      setPendingFile(null);
+      setLabel("");
+      setDesc("");
+      setAdding(false);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:upload_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async (costumeId: string, costumeLabel: string) => {
+    if (!window.confirm(t("assets:delete_costume_confirm", { name, label: costumeLabel }))) return;
+    try {
+      await API.deleteCharacterCostume(projectName, name, costumeId);
+      await onReload?.();
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between">
+        <CapsLabel>{t("assets:costume_references")}</CapsLabel>
+        <button
+          type="button"
+          onClick={() => setAdding(!adding)}
+          className="focus-ring text-[11px] text-[var(--color-text-3)] transition-colors hover:text-[var(--color-text)]"
+        >
+          {adding ? t("cancel") : "+ " + t("assets:add_costume")}
+        </button>
+      </div>
+      {adding && (
+        <div className="mt-1.5 space-y-1.5 rounded-lg p-2" style={{ background: "oklch(0.18 0.010 265 / 0.35)", border: "1px solid var(--color-hairline)" }}>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={t("assets:costume_label_placeholder")}
+            className="w-full rounded px-2 py-1 text-[12px] outline-none"
+            style={FIELD_STYLE}
+          />
+          <input
+            type="text"
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            placeholder={t("assets:costume_desc_placeholder")}
+            className="w-full rounded px-2 py-1 text-[12px] outline-none"
+            style={FIELD_STYLE}
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="focus-ring rounded px-2 py-1 text-[11px]"
+              style={{ color: "var(--color-accent-2)", border: "1px solid var(--color-accent-soft)" }}
+            >
+              {pendingFile ? pendingFile.name.slice(0, 20) : t("assets:upload_sheet_short")}
+            </button>
+            <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setPendingFile(f); }} />
+            <button
+              type="button"
+              onClick={() => void handleUpload()}
+              disabled={uploading || !pendingFile || !label.trim()}
+              className="focus-ring rounded px-2 py-1 text-[11px] font-medium disabled:opacity-40"
+              style={{ color: "oklch(0.14 0 0)", background: "var(--color-accent-2)" }}
+            >
+              {uploading ? "..." : t("assets:upload_sheet_short")}
+            </button>
+          </div>
+        </div>
+      )}
+      {costumes.length > 0 && (
+        <div className="mt-1.5 space-y-1">
+          {costumes.map((c) => {
+            const url = c.image_path ? API.getFileUrl(projectName, c.image_path) : null;
+            return (
+              <div key={c.id} className="flex items-center gap-2 rounded-lg p-1.5" style={{ background: "oklch(0.18 0.010 265 / 0.25)", border: "1px solid var(--color-hairline-soft)" }}>
+                {url ? (
+                  <img src={url} alt={c.label} className="h-10 w-10 shrink-0 rounded object-cover" />
+                ) : (
+                  <div className="h-10 w-10 shrink-0 rounded" style={{ background: "var(--color-hairline)" }} />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12px] font-medium" style={{ color: "var(--color-text)" }}>{c.label}</div>
+                  {c.description && <div className="truncate text-[11px]" style={{ color: "var(--color-text-4)" }}>{c.description}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(c.id, c.label)}
+                  title={t("assets:delete_costume")}
+                  className="focus-ring shrink-0 rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.05)]"
+                  style={{ color: "var(--color-text-4)" }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Variant section
+// ---------------------------------------------------------------------------
+
+function VariantSection({
+  name,
+  character,
+  projectName,
+  onReload,
+  t,
+}: {
+  name: string;
+  character: Character;
+  projectName: string;
+  onReload?: () => Promise<unknown> | void;
+  t: (key: string, vars?: Record<string, string>) => string;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [vLabel, setVLabel] = useState("");
+  const [vDesc, setVDesc] = useState("");
+
+  const variants = character.variants ?? [];
+
+  const handleAdd = async () => {
+    if (!vLabel.trim()) return;
+    setSaving(true);
+    try {
+      await API.addCharacterVariant(projectName, name, {
+        label: vLabel.trim(),
+        description: vDesc.trim(),
+      });
+      setVLabel("");
+      setVDesc("");
+      setAdding(false);
+      await onReload?.();
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (variantId: string, variantLabel: string) => {
+    if (!window.confirm(t("assets:delete_variant_confirm", { name, label: variantLabel }))) return;
+    try {
+      await API.deleteCharacterVariant(projectName, name, variantId);
+      await onReload?.();
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    }
+  };
+
+  const handleSheetUpload = async (variantId: string, file: File) => {
+    try {
+      await API.uploadVariantSheet(projectName, name, variantId, file);
+      await onReload?.();
+      useAppStore.getState().pushToast(t("assets:upload_sheet_success", { name }), "success");
+    } catch (err) {
+      useAppStore.getState().pushToast(errMsg(err), "error");
+    }
+  };
+
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between">
+        <CapsLabel>{t("assets:variants")}</CapsLabel>
+        <button
+          type="button"
+          onClick={() => setAdding(!adding)}
+          className="focus-ring text-[11px] text-[var(--color-text-3)] transition-colors hover:text-[var(--color-text)]"
+        >
+          {adding ? t("cancel") : "+ " + t("assets:add_variant")}
+        </button>
+      </div>
+      {adding && (
+        <div className="mt-1.5 space-y-1.5 rounded-lg p-2" style={{ background: "oklch(0.18 0.010 265 / 0.35)", border: "1px solid var(--color-hairline)" }}>
+          <input
+            type="text"
+            value={vLabel}
+            onChange={(e) => setVLabel(e.target.value)}
+            placeholder={t("assets:variant_label_placeholder")}
+            className="w-full rounded px-2 py-1 text-[12px] outline-none"
+            style={FIELD_STYLE}
+          />
+          <input
+            type="text"
+            value={vDesc}
+            onChange={(e) => setVDesc(e.target.value)}
+            placeholder={t("assets:variant_desc_placeholder")}
+            className="w-full rounded px-2 py-1 text-[12px] outline-none"
+            style={FIELD_STYLE}
+          />
+          <button
+            type="button"
+            onClick={() => void handleAdd()}
+            disabled={saving || !vLabel.trim()}
+            className="focus-ring rounded px-2 py-1 text-[11px] font-medium disabled:opacity-40"
+            style={{ color: "oklch(0.14 0 0)", background: "var(--color-accent-2)" }}
+          >
+            {saving ? "..." : t("create")}
+          </button>
+        </div>
+      )}
+      {variants.length > 0 && (
+        <div className="mt-1.5 space-y-1.5">
+          {variants.map((v) => {
+            const sheetUrl = v.character_sheet ? API.getFileUrl(projectName, v.character_sheet) : null;
+            const sheetInputRef = useRef<HTMLInputElement>(null);
+            return (
+              <div key={v.id} className="rounded-lg p-2" style={{ background: "oklch(0.18 0.010 265 / 0.25)", border: "1px solid var(--color-hairline-soft)" }}>
+                <div className="flex items-start justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-medium" style={{ color: "var(--color-text)" }}>{v.label}</div>
+                    {v.description && <div className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-4)" }}>{v.description}</div>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(v.id, v.label)}
+                    title={t("assets:delete_variant")}
+                    className="focus-ring shrink-0 rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.05)]"
+                    style={{ color: "var(--color-text-4)" }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  {sheetUrl ? (
+                    <PreviewableImageFrame src={sheetUrl} alt={v.label}>
+                      <img src={sheetUrl} alt={v.label} className="h-14 w-24 rounded object-cover" style={{ border: "1px solid var(--color-hairline-soft)" }} />
+                    </PreviewableImageFrame>
+                  ) : (
+                    <div className="flex h-14 w-24 items-center justify-center rounded" style={{ border: "1px dashed var(--color-hairline)", color: "var(--color-text-4)" }}>
+                      <span className="text-[10px]">{t("assets:upload_variant_sheet")}</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => sheetInputRef.current?.click()}
+                    className="focus-ring rounded px-2 py-0.5 text-[11px]"
+                    style={{ color: "var(--color-text-3)", border: "1px solid var(--color-hairline)" }}
+                  >
+                    {sheetUrl ? t("replace") : t("assets:upload_sheet_short")}
+                  </button>
+                  <input
+                    ref={sheetInputRef}
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) void handleSheetUpload(v.id, f);
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

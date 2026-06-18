@@ -613,6 +613,130 @@ class API {
     return (await response.json()) as { success: boolean; path: string; url: string };
   }
 
+  static async uploadCharacterCostume(
+    projectName: string,
+    charName: string,
+    file: File,
+    label: string,
+    description: string = ""
+  ): Promise<{ success: boolean; costume: { id: string; label: string; description: string; image_path: string } }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("label", label);
+    formData.append("description", description);
+    const response = await fetch(
+      `${API_BASE}/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/costumes`,
+      withAuth({ method: "POST", body: formData })
+    );
+    await throwIfNotOk(response, "上传服装参考失败");
+    return (await response.json()) as { success: boolean; costume: { id: string; label: string; description: string; image_path: string } };
+  }
+
+  static async deleteCharacterCostume(
+    projectName: string,
+    charName: string,
+    costumeId: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/costumes/${encodeURIComponent(costumeId)}`,
+      { method: "DELETE" }
+    );
+  }
+
+  static async updateCharacterCostume(
+    projectName: string,
+    charName: string,
+    costumeId: string,
+    updates: { label?: string; description?: string }
+  ): Promise<SuccessResponse> {
+    const qs = new URLSearchParams();
+    if (updates.label !== undefined) qs.set("label", updates.label);
+    if (updates.description !== undefined) qs.set("description", updates.description);
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/costumes/${encodeURIComponent(costumeId)}?${qs.toString()}`,
+      { method: "PATCH" }
+    );
+  }
+
+  static async replaceCostumeImage(
+    projectName: string,
+    charName: string,
+    costumeId: string,
+    file: File
+  ): Promise<{ success: boolean; path: string; url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(
+      `${API_BASE}/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/costumes/${encodeURIComponent(costumeId)}/image`,
+      withAuth({ method: "POST", body: formData })
+    );
+    await throwIfNotOk(response, "替换服装图片失败");
+    return (await response.json()) as { success: boolean; path: string; url: string };
+  }
+
+  static async addCharacterVariant(
+    projectName: string,
+    charName: string,
+    variant: { id?: string; label: string; description?: string; costume_reference_ids?: string[] }
+  ): Promise<{ success: boolean; variant: { id: string; label: string; description: string; character_sheet: string; costume_reference_ids: string[] } }> {
+    const response = await fetch(
+      `${API_BASE}/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/variants`,
+      withAuth({ method: "POST", body: JSON.stringify(variant) })
+    );
+    await throwIfNotOk(response, "添加角色变体失败");
+    return (await response.json()) as { success: boolean; variant: { id: string; label: string; description: string; character_sheet: string; costume_reference_ids: string[] } };
+  }
+
+  static async deleteCharacterVariant(
+    projectName: string,
+    charName: string,
+    variantId: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/variants/${encodeURIComponent(variantId)}`,
+      { method: "DELETE" }
+    );
+  }
+
+  static async uploadVariantSheet(
+    projectName: string,
+    charName: string,
+    variantId: string,
+    file: File
+  ): Promise<{ success: boolean; path: string; url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(
+      `${API_BASE}/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/variants/${encodeURIComponent(variantId)}/sheet`,
+      withAuth({ method: "POST", body: formData })
+    );
+    await throwIfNotOk(response, "上传变体设计图失败");
+    return (await response.json()) as { success: boolean; path: string; url: string };
+  }
+
+  static async updateCharacterVariant(
+    projectName: string,
+    charName: string,
+    variantId: string,
+    updates: { label?: string; description?: string; costume_reference_ids?: string[] }
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/variants/${encodeURIComponent(variantId)}`,
+      { method: "PATCH", body: JSON.stringify(updates) }
+    );
+  }
+
+  static async deleteVariantSheet(
+    projectName: string,
+    charName: string,
+    variantId: string
+  ): Promise<SuccessResponse> {
+    return this.request(
+      `/projects/${encodeURIComponent(projectName)}/characters/${encodeURIComponent(charName)}/variants/${encodeURIComponent(variantId)}/sheet`,
+      { method: "DELETE" }
+    );
+  }
+
   static async deleteCharacterVoiceReference(
     projectName: string,
     charName: string

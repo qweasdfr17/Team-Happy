@@ -34,13 +34,15 @@ user-invocable: true
 
 1. **读取完整上下文（禁止只读摘要）**：
    - 必须读取 `scripts/episode_N.json` 的 **完整 video_units / shots**（当前 unit 的所有镜头原文、text、image_prompt、video_prompt）
-   - 必须读取 `project.json` 中的 **characters / scenes / props / products** 全量资产（含 `voice_style` / `voice_reference_audio`，若角色有声音参考则生成时可感知）
+   - 必须读取 `project.json` 中的 **characters / scenes / props / products** 全量资产（含 `voice_style` / `voice_reference_audio` / `costume_references` / `variants`，若角色有服装参考或变体则生成时可感知）
    - context_pack 是辅助摘要，**不能替代**上述原文读取
    - **禁止**只根据 episode outline / 分集剧情摘要生成精品提示词
 2. **查 prompt_library**：根据 style / 镜头类型取 1-3 条相关模板
 3. **逐镜头生成**：reference_video 优先套用 `references/9-section-template.md`，再运用下方方法论补足细节
    - 保留当前 unit 原有的角色/场景/道具引用关系
    - 图片声明中的资产名必须来自 project.json 已注册资产
+   - 若角色有 variant（如"少年萧近宸"），优先使用 variant 的 character_sheet 和 costume_reference_ids 来确定参考图
+   - 若角色有服装参考（costume_references），在图片声明中注明使用的服装
 4. **写回**：reference_video 必须调用 `mcp__arcreel__patch_reference_video_unit_prompt` 写入红框
    - **必须传递 `references` 参数**：按图片1-N 顺序写出 `[{type, name}]` 列表
    - 如果忘记传递 references，工具会自动从 prompt 文本中的"图片N：资产名"推断并补全

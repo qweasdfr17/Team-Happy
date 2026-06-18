@@ -149,6 +149,8 @@ MESSAGES = {
     "voice_reference_uploaded": "「{name}」声音参考已上传",
     "voice_reference_deleted": "「{name}」声音参考已删除",
     "voice_reference_not_character": "仅角色支持声音参考上传",
+    "costume_deleted": "「{name}」服装参考已删除",
+    "variant_deleted": "「{name}」变体已删除",
     # API Keys
     "jwt_auth_required": "API Key 无权执行此操作，请使用 JWT 认证",
     "api_key_name_exists": "名称 '{name}' 已存在",

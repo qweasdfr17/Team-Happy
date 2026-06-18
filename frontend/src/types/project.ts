@@ -15,6 +15,21 @@ export interface ProjectOverview {
   generated_at?: string;
 }
 
+export interface CostumeReference {
+  id: string;
+  label: string;
+  description: string;
+  image_path: string;
+}
+
+export interface CharacterVariant {
+  id: string;
+  label: string;
+  description: string;
+  character_sheet: string;
+  costume_reference_ids: string[];
+}
+
 export interface Character {
   description: string;
   character_sheet?: string;
@@ -22,6 +37,10 @@ export interface Character {
   reference_image?: string;
   /** 用户上传的配音参考音频路径（项目内角色独有字段）。 */
   voice_reference_audio?: string;
+  /** 服装参考列表。 */
+  costume_references?: CostumeReference[];
+  /** 角色变体列表（少年/成年/战损装等）。 */
+  variants?: CharacterVariant[];
 }
 
 export interface Scene {

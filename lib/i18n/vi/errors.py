@@ -149,6 +149,8 @@ MESSAGES = {
     "voice_reference_uploaded": "Đã tải lên giọng đọc tham khảo của '{name}'",
     "voice_reference_deleted": "Đã xóa giọng đọc tham khảo của '{name}'",
     "voice_reference_not_character": "Giọng đọc tham khảo chỉ dành cho nhân vật",
+    "costume_deleted": "Đã xóa trang phục tham khảo của '{name}'",
+    "variant_deleted": "Đã xóa biến thể của '{name}'",
     # API Keys
     "jwt_auth_required": "API Key không được phép thực hiện thao tác này, vui lòng dùng xác thực JWT",
     "api_key_name_exists": "Tên '{name}' đã tồn tại",

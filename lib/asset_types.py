@@ -21,6 +21,8 @@ class AssetSpec:
     string」、`_build_asset_entry` 据此初始化默认空串、REST PATCH 据此扩展可更新字段集；
     ``extra_list_fields`` 是 schema 维度的列表变体——字段若存在须为「字符串列表」，
     `_build_asset_entry` 初始化默认空列表，REST PATCH 同样据此扩展；
+    ``extra_dict_list_fields`` 是 schema 维度的字典列表变体——字段若存在须为
+    「字典列表」，`_build_asset_entry` 初始化默认空列表，REST PATCH 同样据此扩展；
     ``agent_editable_extra_fields`` 是权限维度——`upsert_assets`（agent 走的入口）的字段
     白名单来自这里，**不复用 schema 维度**。两者解耦的原因：``reference_image`` /
     ``reference_images`` 是用户上传或系统生成的文件路径，是 schema 维度字段但不是
@@ -38,6 +40,7 @@ class AssetSpec:
     label_zh: str
     extra_string_fields: tuple[str, ...] = ()
     extra_list_fields: tuple[str, ...] = ()
+    extra_dict_list_fields: tuple[str, ...] = ()
     agent_editable_extra_fields: tuple[str, ...] = ()
     in_global_library: bool = True
 
@@ -50,9 +53,11 @@ ASSET_SPECS: dict[str, AssetSpec] = {
         subdir="characters",
         label_zh="角色",
         extra_string_fields=("voice_style", "reference_image", "voice_reference_audio"),
+        extra_dict_list_fields=("costume_references", "variants"),
         # voice_style 是 LLM 生成的角色配音风格，agent 可改；reference_image 是用户上传
         # 的文件路径（系统级），不进 agent 白名单——更新走 update_character_reference_image；
-        # voice_reference_audio 是用户上传的配音参考音频路径，不进 agent 白名单。
+        # voice_reference_audio 是用户上传的配音参考音频路径，不进 agent 白名单；
+        # costume_references / variants 是用户管理的结构化列表，不进 agent 白名单。
         agent_editable_extra_fields=("voice_style",),
     ),
     "scene": AssetSpec(

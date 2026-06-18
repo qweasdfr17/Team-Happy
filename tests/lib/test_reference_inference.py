@@ -132,3 +132,62 @@ class TestSimplifiedDeclarations:
         assert types["欧阳韬"] == "character"
         assert types["中学走廊"] == "scene"
         assert types["戒指"] == "prop"
+
+
+class TestVariantCostumeInference:
+    """变体/服装参考的 reference inference。"""
+
+    def test_variant_label_prefix_matches_base_character(self):
+        """'少年萧近宸' → variant label '少年时期' + char name '萧近宸' 的组合匹配。"""
+        project = _project()
+        project["characters"]["萧近宸"] = {
+            "description": "王爷",
+            "variants": [
+                {"id": "v1", "label": "少年时期", "description": "15岁", "character_sheet": "variants/少年.png", "costume_reference_ids": []},
+                {"id": "v2", "label": "成年时期", "description": "25岁", "character_sheet": "variants/成年.png", "costume_reference_ids": []},
+            ],
+        }
+        prompt = "图片1：少年时期萧近宸\n图片2：成年时期萧近宸\n正文"
+        refs = infer_references_from_prompt_text(project, prompt)
+        assert len(refs) == 2
+        # 均绑定基础角色"萧近宸"
+        assert refs[0] == {"type": "character", "name": "萧近宸"}
+        assert refs[1] == {"type": "character", "name": "萧近宸"}
+
+    def test_costume_label_matches_base_character(self):
+        """'王爷常服' → costume label 匹配到角色。"""
+        project = _project()
+        project["characters"]["萧近宸"] = {
+            "description": "王爷",
+            "costume_references": [
+                {"id": "c1", "label": "王爷常服", "description": "玄色锦袍", "image_path": "costumes/x.png"},
+            ],
+        }
+        prompt = "图片1：萧近宸 王爷常服\n正文"
+        refs = infer_references_from_prompt_text(project, prompt)
+        assert len(refs) == 1
+        assert refs[0] == {"type": "character", "name": "萧近宸"}
+
+    def test_no_variant_no_costume_still_compatible(self):
+        """老项目没有 variant/costume，推断不受影响。"""
+        project = _project()
+        prompt = "图片1：欧阳韬\n图片2：中学走廊"
+        refs = infer_references_from_prompt_text(project, prompt)
+        assert len(refs) == 2
+        assert refs[0] == {"type": "character", "name": "欧阳韬"}
+        assert refs[1] == {"type": "scene", "name": "中学走廊"}
+
+    def test_variant_does_not_create_duplicate_refs(self):
+        """variant 匹配不产生重复引用（同一基础角色出现多次时按图号保留）。"""
+        project = _project()
+        project["characters"]["萧近宸"] = {
+            "description": "王爷",
+            "variants": [
+                {"id": "v1", "label": "少年时期", "description": "", "character_sheet": "", "costume_reference_ids": []},
+            ],
+        }
+        prompt = "图片1：少年时期萧近宸\n图片2：萧近宸\n正文"
+        refs = infer_references_from_prompt_text(project, prompt)
+        assert len(refs) == 2
+        assert refs[0]["name"] == "萧近宸"
+        assert refs[1]["name"] == "萧近宸"

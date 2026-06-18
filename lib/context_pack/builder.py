@@ -79,12 +79,18 @@ def build_context_pack(project: dict, script: dict, *, source_script: str = "") 
     for name, entry in characters.items():
         if not isinstance(entry, dict):
             entry = {}
+        costumes_raw = entry.get("costume_references")
+        costume_refs: list[dict] = list(costumes_raw) if isinstance(costumes_raw, list) else []
+        variants_raw = entry.get("variants")
+        variants_list: list[dict] = list(variants_raw) if isinstance(variants_raw, list) else []
         pack["characters_with_aliases"].append({
             "name": name,
             "aliases": [],
             "description": entry.get("description", ""),
             "voice_style": entry.get("voice_style", ""),
             "voice_reference_audio": entry.get("voice_reference_audio", ""),
+            "costume_references": costume_refs,
+            "variants": variants_list,
             "referenced_shots": char_shot_map.get(name, []),
             "has_sheet": _has_sheet(characters, name, char_spec.sheet_field) if char_spec else False,
         })

@@ -83,6 +83,7 @@ def build_asset_router(
     result_key = asset_type
     update_fields: tuple[str, ...] = ("description", spec.sheet_field, *spec.extra_string_fields)
     update_list_fields: tuple[str, ...] = spec.extra_list_fields
+    update_dict_list_fields: tuple[str, ...] = spec.extra_dict_list_fields
 
     router = APIRouter()
 
@@ -106,6 +107,12 @@ def build_asset_router(
             value = extras.get(field)
             if value is not None and not _is_string_list(value):
                 raise HTTPException(status_code=422, detail=f"field '{field}' must be a list of strings")
+        # 字典列表字段（costume_references / variants 等）须为 list[dict]。
+        for field in spec.extra_dict_list_fields:
+            value = extras.get(field)
+            if value is not None:
+                if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+                    raise HTTPException(status_code=422, detail=f"field '{field}' must be a list of objects")
         try:
 
             def _sync():
@@ -114,6 +121,8 @@ def build_asset_router(
                 for field in spec.extra_string_fields:
                     entry[field] = extras.get(field, "")
                 for field in spec.extra_list_fields:
+                    entry[field] = list(extras.get(field) or [])
+                for field in spec.extra_dict_list_fields:
                     entry[field] = list(extras.get(field) or [])
                 with project_change_source("webui"):
                     ok = manager._add_asset(asset_type, project_name, name, entry)
@@ -150,6 +159,11 @@ def build_asset_router(
             value = req.get(field)
             if value is not None and not _is_string_list(value):
                 raise HTTPException(status_code=422, detail=f"field '{field}' must be a list of strings")
+        for field in update_dict_list_fields:
+            value = req.get(field)
+            if value is not None:
+                if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+                    raise HTTPException(status_code=422, detail=f"field '{field}' must be a list of objects")
 
         try:
 
@@ -162,7 +176,7 @@ def build_asset_router(
                     if entry_name not in bucket:
                         raise KeyError(entry_name)
                     entry = bucket[entry_name]
-                    for field in (*update_fields, *update_list_fields):
+                    for field in (*update_fields, *update_list_fields, *update_dict_list_fields):
                         if req.get(field) is not None:
                             entry[field] = req[field]
                     result.update(entry)

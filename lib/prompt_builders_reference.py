@@ -13,8 +13,8 @@ from __future__ import annotations
 def _format_asset_names(assets: dict | None) -> str:
     """格式化资产列表为 prompt 可读文本。
 
-    对角色类型额外展示 voice_style / voice_reference_audio（若存在），
-    供 agent 在生成配音/视频提示词时感知。
+    对角色类型额外展示 voice_style / voice_reference_audio / costume_references /
+    variants（若存在），供 agent 在生成配音/视频提示词时感知。
     """
     if not assets:
         return "（无）"
@@ -23,13 +23,25 @@ def _format_asset_names(assets: dict | None) -> str:
         desc = meta.get("description", "") if isinstance(meta, dict) else ""
         line = f"- {name}: {desc}"
         if isinstance(meta, dict):
+            extras: list[str] = []
             voice_style = meta.get("voice_style", "")
             voice_ref = meta.get("voice_reference_audio", "")
-            extras: list[str] = []
             if voice_style:
                 extras.append(f"配音风格: {voice_style}")
             if voice_ref:
                 extras.append(f"声音参考: {voice_ref}")
+            # 服装参考
+            costumes = meta.get("costume_references")
+            if isinstance(costumes, list) and costumes:
+                costume_labels = [c.get("label", c.get("id", "?")) for c in costumes if isinstance(c, dict)]
+                if costume_labels:
+                    extras.append(f"服装: {', '.join(costume_labels)}")
+            # 变体
+            variants = meta.get("variants")
+            if isinstance(variants, list) and variants:
+                variant_labels = [v.get("label", v.get("id", "?")) for v in variants if isinstance(v, dict)]
+                if variant_labels:
+                    extras.append(f"变体: {', '.join(variant_labels)}")
             if extras:
                 line += "（" + "；".join(extras) + "）"
         lines.append(line)

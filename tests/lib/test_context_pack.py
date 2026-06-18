@@ -294,3 +294,38 @@ class TestVoiceReferenceInContextPack:
         # 参考图应在 state 中正确
         state = pack["asset_reference_state"]
         assert len(state["assets_without_sheet"]) == 0
+
+
+class TestCostumeAndVariantInContextPack:
+    """costume_references / variants 进入 context pack。"""
+
+    def test_costume_references_in_pack(self):
+        project = _project()
+        project["characters"]["女主"]["costume_references"] = [
+            {"id": "c1", "label": "战甲", "description": "银色铠甲", "image_path": "characters/costumes/x.png"},
+        ]
+        shots = [_ad_shot("E1S01")]
+        pack = build_context_pack(project, {"shots": shots})
+        char_entry = next(c for c in pack["characters_with_aliases"] if c["name"] == "女主")
+        assert len(char_entry["costume_references"]) == 1
+        assert char_entry["costume_references"][0]["label"] == "战甲"
+
+    def test_variants_in_pack(self):
+        project = _project()
+        project["characters"]["女主"]["variants"] = [
+            {"id": "v1", "label": "少年", "description": "10岁", "character_sheet": "", "costume_reference_ids": []},
+        ]
+        shots = [_ad_shot("E1S01")]
+        pack = build_context_pack(project, {"shots": shots})
+        char_entry = next(c for c in pack["characters_with_aliases"] if c["name"] == "女主")
+        assert len(char_entry["variants"]) == 1
+        assert char_entry["variants"][0]["label"] == "少年"
+
+    def test_no_costume_variant_still_compatible(self):
+        """老项目没有 costume/variant 字段，默认空列表。"""
+        project = _project()
+        shots = [_ad_shot("E1S01")]
+        pack = build_context_pack(project, {"shots": shots})
+        char_entry = next(c for c in pack["characters_with_aliases"] if c["name"] == "女主")
+        assert char_entry["costume_references"] == []
+        assert char_entry["variants"] == []

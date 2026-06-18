@@ -2167,6 +2167,14 @@ class ProjectManager:
                 entry[field] = []
             else:
                 entry[field] = value  # 非法类型透传，由落盘前结构校验 fail-loud
+        for field in spec.extra_dict_list_fields:
+            value = data.get(field)
+            if isinstance(value, list):
+                entry[field] = list(value)
+            elif value is None:
+                entry[field] = []
+            else:
+                entry[field] = value
         return entry
 
     def add_character(self, project_name: str, name: str, description: str, voice_style: str = "") -> bool:

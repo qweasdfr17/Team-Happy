@@ -149,6 +149,8 @@ MESSAGES = {
     "voice_reference_uploaded": "Voice reference of '{name}' uploaded",
     "voice_reference_deleted": "Voice reference of '{name}' deleted",
     "voice_reference_not_character": "Voice reference is only available for characters",
+    "costume_deleted": "Costume reference of '{name}' deleted",
+    "variant_deleted": "Variant of '{name}' deleted",
     # API Keys
     "jwt_auth_required": "API Key is not authorized to perform this action, please use JWT authentication",
     "api_key_name_exists": "Name '{name}' already exists",

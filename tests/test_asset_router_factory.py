@@ -461,3 +461,282 @@ class TestVoiceReference:
         assert resp.status_code == 200
         assert pm.projects["demo"]["characters"]["Alice"]["voice_reference_audio"] == ""
         assert outside.exists()  # 不应该被删除
+
+
+class TestCostumeReferences:
+    """测试角色服装参考上传/删除端点。"""
+
+    def test_upload_costume_creates_entry_and_file(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "王爷常服", "description": "玄色锦袍"},
+                files={"file": ("robe.png", b"fake-png", "image/png")},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        costume = data["costume"]
+        assert costume["label"] == "王爷常服"
+        assert costume["description"] == "玄色锦袍"
+        assert "image_path" in costume
+        assert "id" in costume
+        # 写入 project.json
+        refs = pm.projects["demo"]["characters"]["Alice"].get("costume_references", [])
+        assert len(refs) == 1
+        assert refs[0]["label"] == "王爷常服"
+
+    def test_delete_costume_removes_entry_and_file(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # 先上传
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "战甲"},
+                files={"file": ("armor.png", b"fake-png", "image/png")},
+            )
+        costume_id = resp.json()["costume"]["id"]
+        image_path = resp.json()["costume"]["image_path"]
+        assert (tmp_path / "demo" / image_path).exists()
+
+        # 再删除
+        with client:
+            resp = client.delete(f"/api/v1/projects/demo/characters/Alice/costumes/{costume_id}")
+        assert resp.status_code == 200
+        refs = pm.projects["demo"]["characters"]["Alice"].get("costume_references", [])
+        assert len(refs) == 0
+        assert not (tmp_path / "demo" / image_path).exists()
+
+    def test_delete_costume_404_on_wrong_id(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/costumes/nonexistent")
+        assert resp.status_code == 404
+
+    def test_delete_costume_cleans_variant_refs(self, monkeypatch, tmp_path):
+        """删除服装时同时清理 variants 中对该 costume 的引用。"""
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "校服"},
+                files={"file": ("school.png", b"png", "image/png")},
+            )
+        costume_id = resp.json()["costume"]["id"]
+        # 手动添加一个引用该 costume 的 variant
+        pm.projects["demo"]["characters"]["Alice"]["variants"] = [
+            {"id": "v1", "label": "少年", "description": "", "character_sheet": "", "costume_reference_ids": [costume_id]}
+        ]
+        with client:
+            resp = client.delete(f"/api/v1/projects/demo/characters/Alice/costumes/{costume_id}")
+        assert resp.status_code == 200
+        variants = pm.projects["demo"]["characters"]["Alice"].get("variants", [])
+        assert costume_id not in variants[0]["costume_reference_ids"]
+
+
+class TestCharacterVariants:
+    """测试角色变体管理端点。"""
+
+    def test_add_variant(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"label": "少年时期", "description": "十五六岁"},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["success"] is True
+        v = data["variant"]
+        assert v["label"] == "少年时期"
+        assert v["description"] == "十五六岁"
+        assert "id" in v
+        # 写入 project.json
+        variants = pm.projects["demo"]["characters"]["Alice"].get("variants", [])
+        assert len(variants) == 1
+
+    def test_add_variant_upserts_on_same_id(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"id": "v_young", "label": "少年", "description": "10岁"},
+            )
+        assert resp.status_code == 200
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"id": "v_young", "label": "少年时期", "description": "15岁"},
+            )
+        assert resp.status_code == 200
+        variants = pm.projects["demo"]["characters"]["Alice"].get("variants", [])
+        assert len(variants) == 1  # 同 id 覆盖
+        assert variants[0]["label"] == "少年时期"
+
+    def test_delete_variant_removes_entry(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"label": "战损装"},
+            )
+        variant_id = resp.json()["variant"]["id"]
+        with client:
+            resp = client.delete(f"/api/v1/projects/demo/characters/Alice/variants/{variant_id}")
+        assert resp.status_code == 200
+        variants = pm.projects["demo"]["characters"]["Alice"].get("variants", [])
+        assert len(variants) == 0
+
+    def test_delete_variant_cleans_sheet_file(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # 添加 variant 并上传 sheet
+        with client:
+            client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"id": "v_adult", "label": "成年"},
+            )
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants/v_adult/sheet",
+                files={"file": ("adult.png", b"png-data", "image/png")},
+            )
+        assert resp.status_code == 200
+        sheet_path = resp.json()["path"]
+        assert (tmp_path / "demo" / sheet_path).exists()
+
+        # 删除 variant
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/variants/v_adult")
+        assert resp.status_code == 200
+        assert not (tmp_path / "demo" / sheet_path).exists()
+
+    def test_upload_variant_sheet_404_missing_variant(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants/nonexistent/sheet",
+                files={"file": ("img.png", b"data", "image/png")},
+            )
+        assert resp.status_code == 404
+
+    def test_add_variant_rejects_empty_label(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"label": ""},
+            )
+        assert resp.status_code == 400
+
+    def test_variant_costume_ids_default_to_empty(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"label": "默认"},
+            )
+        assert resp.status_code == 200
+        v = resp.json()["variant"]
+        assert v["costume_reference_ids"] == []
+
+
+class TestCostumeEdit:
+    """测试服装参考编辑/替换端点。"""
+
+    def test_patch_costume_label(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        # 先上传
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "旧标签", "description": "旧描述"},
+                files={"file": ("c.png", b"png", "image/png")},
+            )
+        cid = resp.json()["costume"]["id"]
+        # 编辑
+        with client:
+            resp = client.patch(
+                f"/api/v1/projects/demo/characters/Alice/costumes/{cid}?label=新标签&description=新描述",
+            )
+        assert resp.status_code == 200
+        refs = pm.projects["demo"]["characters"]["Alice"]["costume_references"]
+        assert refs[0]["label"] == "新标签"
+        assert refs[0]["description"] == "新描述"
+
+    def test_replace_costume_image(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "原图"},
+                files={"file": ("old.png", b"old", "image/png")},
+            )
+        cid = resp.json()["costume"]["id"]
+        old_path = resp.json()["costume"]["image_path"]
+        # 替换图片
+        with client:
+            resp = client.post(
+                f"/api/v1/projects/demo/characters/Alice/costumes/{cid}/image",
+                files={"file": ("new.png", b"newdata", "image/png")},
+            )
+        assert resp.status_code == 200
+        refs = pm.projects["demo"]["characters"]["Alice"]["costume_references"]
+        # 同扩展名时路径不变，但文件被新内容覆盖
+        new_path = resp.json()["path"]
+        assert (tmp_path / "demo" / new_path).exists()
+        assert (tmp_path / "demo" / new_path).read_text() == "newdata"
+
+
+class TestVariantEdit:
+    """测试变体编辑/删除 sheet 端点。"""
+
+    def test_patch_variant_label_and_costume_ids(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            client.post(
+                "/api/v1/projects/demo/characters/Alice/costumes",
+                data={"label": "校服"},
+                files={"file": ("s.png", b"png", "image/png")},
+            )
+        cid = pm.projects["demo"]["characters"]["Alice"]["costume_references"][0]["id"]
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"id": "vx", "label": "旧变体", "description": "旧描述"},
+            )
+        assert resp.status_code == 200
+        # 编辑
+        with client:
+            resp = client.patch(
+                "/api/v1/projects/demo/characters/Alice/variants/vx",
+                json={"label": "新变体", "description": "新描述", "costume_reference_ids": [cid]},
+            )
+        assert resp.status_code == 200
+        variants = pm.projects["demo"]["characters"]["Alice"]["variants"]
+        assert variants[0]["label"] == "新变体"
+        assert variants[0]["description"] == "新描述"
+        assert variants[0]["costume_reference_ids"] == [cid]
+
+    def test_delete_variant_sheet_keeps_variant(self, monkeypatch, tmp_path):
+        client, pm = _full_client(monkeypatch, tmp_path)
+        with client:
+            client.post(
+                "/api/v1/projects/demo/characters/Alice/variants",
+                json={"id": "v_keep", "label": "保留"},
+            )
+        with client:
+            resp = client.post(
+                "/api/v1/projects/demo/characters/Alice/variants/v_keep/sheet",
+                files={"file": ("sheet.png", b"png", "image/png")},
+            )
+        sheet_path = resp.json()["path"]
+        assert (tmp_path / "demo" / sheet_path).exists()
+        # 删除 sheet
+        with client:
+            resp = client.delete("/api/v1/projects/demo/characters/Alice/variants/v_keep/sheet")
+        assert resp.status_code == 200
+        variants = pm.projects["demo"]["characters"]["Alice"]["variants"]
+        assert len(variants) == 1  # variant 保留
+        assert variants[0]["character_sheet"] == ""  # sheet 清空
+        assert not (tmp_path / "demo" / sheet_path).exists()  # 文件删除
