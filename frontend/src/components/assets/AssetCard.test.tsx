@@ -12,7 +12,7 @@ vi.mock("react-i18next", () => ({
 
 const asset = {
   id: "1", type: "scene" as const, name: "庙宇", description: "阴森古朴",
-  voice_style: "", image_path: null, source_project: "demo", updated_at: null,
+  voice_style: "", image_path: null, audio_path: null, source_project: "demo", updated_at: null,
 };
 
 describe("AssetCard", () => {
@@ -34,5 +34,20 @@ describe("AssetCard", () => {
     render(<AssetCard asset={asset} onEdit={() => {}} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: /delete/ }));
     expect(onDelete).toHaveBeenCalledWith(asset);
+  });
+
+  it("shows audio player for character voice reference", () => {
+    const { container } = render(
+      <AssetCard
+        asset={{
+          ...asset,
+          type: "character",
+          audio_path: "_global_assets/character/voice.mp3",
+        }}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
+    );
+    expect(container.querySelector("audio")).toBeInTheDocument();
   });
 });

@@ -143,6 +143,71 @@ class TestAssetsCRUD:
         assert r2.status_code == 200
         assert r2.json()["asset"]["image_path"] is not None
 
+    def test_create_character_with_audio(self, _assets_env):
+        client = _assets_env["client"]
+        pm = _assets_env["pm"]
+        audio = b"ID3" + b"\x00" * 64
+
+        r = client.post(
+            "/api/v1/assets",
+            data={"type": "character", "name": "VoiceHero"},
+            files={"audio": ("voice.mp3", audio, "audio/mpeg")},
+        )
+
+        assert r.status_code == 200, r.text
+        audio_path = r.json()["asset"]["audio_path"]
+        assert audio_path and audio_path.startswith("_global_assets/character/")
+        assert (pm.projects_root / audio_path).read_bytes() == audio
+
+    def test_create_scene_with_audio_rejected(self, _assets_env):
+        client = _assets_env["client"]
+
+        r = client.post(
+            "/api/v1/assets",
+            data={"type": "scene", "name": "SceneWithVoice"},
+            files={"audio": ("voice.mp3", b"audio", "audio/mpeg")},
+        )
+
+        assert r.status_code == 400
+
+    def test_replace_audio_cleans_old_audio(self, _assets_env):
+        client = _assets_env["client"]
+        pm = _assets_env["pm"]
+        r = client.post(
+            "/api/v1/assets",
+            data={"type": "character", "name": "ReplaceVoice"},
+            files={"audio": ("old.mp3", b"old-audio", "audio/mpeg")},
+        )
+        assert r.status_code == 200, r.text
+        aid = r.json()["asset"]["id"]
+        old_rel = r.json()["asset"]["audio_path"]
+        assert old_rel
+        assert (pm.projects_root / old_rel).exists()
+
+        r2 = client.post(
+            f"/api/v1/assets/{aid}/audio",
+            files={"audio": ("new.wav", b"new-audio", "audio/wav")},
+        )
+
+        assert r2.status_code == 200, r2.text
+        new_rel = r2.json()["asset"]["audio_path"]
+        assert new_rel and new_rel.endswith(".wav")
+        assert not (pm.projects_root / old_rel).exists()
+        assert (pm.projects_root / new_rel).read_bytes() == b"new-audio"
+
+    def test_replace_audio_rejects_non_character(self, _assets_env):
+        client = _assets_env["client"]
+        r = client.post("/api/v1/assets", data={"type": "prop", "name": "SilentProp"})
+        assert r.status_code == 200, r.text
+        aid = r.json()["asset"]["id"]
+
+        r2 = client.post(
+            f"/api/v1/assets/{aid}/audio",
+            files={"audio": ("voice.mp3", b"audio", "audio/mpeg")},
+        )
+
+        assert r2.status_code == 400
+
     def test_replace_image_invalid_format_preserves_old_image(self, _assets_env):
         """If new upload fails validation, old image must NOT be deleted."""
         client = _assets_env["client"]

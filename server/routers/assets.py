@@ -1,4 +1,4 @@
-"""assets 全局资产库路由。"""
+﻿"""assets 全局资产库路由。"""
 
 from __future__ import annotations
 
@@ -32,8 +32,10 @@ def get_project_manager() -> ProjectManager:
     return pm
 
 
-MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-ALLOWED_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+MAX_IMAGE_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_AUDIO_UPLOAD_BYTES = 20 * 1024 * 1024
+ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
+ALLOWED_AUDIO_EXTS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
 
 
 def _validate_asset_name(name: str, _t: Translator) -> str:
@@ -52,18 +54,26 @@ def _serialize(asset) -> dict:
         "description": asset.description,
         "voice_style": asset.voice_style,
         "image_path": asset.image_path,
+        "audio_path": asset.audio_path,
         "source_project": asset.source_project,
         "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
     }
 
 
-async def _save_upload(file: UploadFile, asset_type: str, _t: Translator) -> str:
+async def _save_upload(
+    file: UploadFile,
+    asset_type: str,
+    _t: Translator,
+    *,
+    allowed_exts: set[str],
+    max_bytes: int,
+) -> str:
     ext = Path(file.filename or "").suffix.lower()
-    if ext not in ALLOWED_EXTS:
+    if ext not in allowed_exts:
         raise HTTPException(status_code=415, detail=_t("asset_unsupported_format"))
 
     data = await file.read()
-    if len(data) > MAX_UPLOAD_BYTES:
+    if len(data) > max_bytes:
         raise HTTPException(status_code=413, detail=_t("asset_upload_too_large"))
 
     root = get_project_manager().get_global_assets_root() / asset_type
@@ -72,6 +82,26 @@ async def _save_upload(file: UploadFile, asset_type: str, _t: Translator) -> str
     await asyncio.to_thread(target.write_bytes, data)
     # 存相对路径（相对 projects_root）
     return f"_global_assets/{asset_type}/{uid}{ext}"
+
+
+async def _save_image_upload(file: UploadFile, asset_type: str, _t: Translator) -> str:
+    return await _save_upload(
+        file,
+        asset_type,
+        _t,
+        allowed_exts=ALLOWED_IMAGE_EXTS,
+        max_bytes=MAX_IMAGE_UPLOAD_BYTES,
+    )
+
+
+async def _save_audio_upload(file: UploadFile, asset_type: str, _t: Translator) -> str:
+    return await _save_upload(
+        file,
+        asset_type,
+        _t,
+        allowed_exts=ALLOWED_AUDIO_EXTS,
+        max_bytes=MAX_AUDIO_UPLOAD_BYTES,
+    )
 
 
 def _delete_global_asset_file(rel_path: str) -> None:
@@ -117,15 +147,21 @@ async def create_asset(
     description: str = Form(""),
     voice_style: str = Form(""),
     image: UploadFile | None = File(None),
+    audio: UploadFile | None = File(None),
 ):
     if type not in GLOBAL_LIBRARY_ASSET_TYPES:
         raise HTTPException(status_code=400, detail=_t("asset_invalid_type"))
     name = _validate_asset_name(name, _t)
+    if audio is not None and audio.filename and type != "character":
+        raise HTTPException(status_code=400, detail=_t("asset_invalid_type"))
 
     # 1) 先落盘再 create；IntegrityError 路径负责清理 orphan
     image_path: str | None = None
+    audio_path: str | None = None
     if image is not None and image.filename:
-        image_path = await _save_upload(image, type, _t)
+        image_path = await _save_image_upload(image, type, _t)
+    if audio is not None and audio.filename:
+        audio_path = await _save_audio_upload(audio, type, _t)
 
     # 2) 真正 create；任何失败路径都必须清理已落盘文件，保证 DB/磁盘一致
     try:
@@ -138,6 +174,7 @@ async def create_asset(
                     description=description,
                     voice_style=voice_style,
                     image_path=image_path,
+                    audio_path=audio_path,
                     source_project=None,
                 )
                 await s.commit()
@@ -147,6 +184,9 @@ async def create_asset(
                 if image_path:
                     _delete_global_asset_file(image_path)
                     image_path = None
+                if audio_path:
+                    _delete_global_asset_file(audio_path)
+                    audio_path = None
                 raise HTTPException(status_code=409, detail=_t("asset_already_exists", name=name))
     except HTTPException:
         raise
@@ -154,6 +194,8 @@ async def create_asset(
         # 其它错误路径也不留 orphan
         if image_path:
             _delete_global_asset_file(image_path)
+        if audio_path:
+            _delete_global_asset_file(audio_path)
         raise
 
     return {"asset": _serialize(a)}
@@ -201,6 +243,8 @@ async def delete_asset(asset_id: str, _user: CurrentUser, _t: Translator):
         if a:
             if a.image_path:
                 _delete_global_asset_file(a.image_path)
+            if a.audio_path:
+                _delete_global_asset_file(a.audio_path)
             await repo.delete(asset_id)
             await s.commit()
     return None
@@ -223,7 +267,7 @@ async def replace_image(
         asset_type = a.type
 
     # 2) 先保存新图（会触发 415/413 校验）—— 旧文件仍完好
-    new_path = await _save_upload(image, asset_type, _t)
+    new_path = await _save_image_upload(image, asset_type, _t)
 
     # 3) 更新 DB；若写入失败则清理已落盘的新文件（旧文件保留）
     try:
@@ -237,6 +281,40 @@ async def replace_image(
         raise
 
     # 4) DB 更新成功后才删除旧文件
+    if old_path and old_path != new_path:
+        _delete_global_asset_file(old_path)
+
+    return {"asset": _serialize(a)}
+
+
+@router.post("/{asset_id}/audio")
+async def replace_audio(
+    asset_id: str,
+    _user: CurrentUser,
+    _t: Translator,
+    audio: UploadFile = File(...),
+):
+    async with async_session_factory() as s:
+        repo = AssetRepository(s)
+        a = await repo.get_by_id(asset_id)
+        if not a:
+            raise HTTPException(status_code=404, detail=_t("asset_not_found", name=asset_id))
+        if a.type != "character":
+            raise HTTPException(status_code=400, detail=_t("asset_invalid_type"))
+        old_path = a.audio_path
+
+    new_path = await _save_audio_upload(audio, "character", _t)
+
+    try:
+        async with async_session_factory() as s:
+            repo = AssetRepository(s)
+            a = await repo.update(asset_id, audio_path=new_path)
+            await s.commit()
+            await s.refresh(a)
+    except Exception:
+        _delete_global_asset_file(new_path)
+        raise
+
     if old_path and old_path != new_path:
         _delete_global_asset_file(old_path)
 

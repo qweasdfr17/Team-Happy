@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, ImagePlus, Landmark, Package, User } from "lucide-react";
+import { AlertTriangle, AudioLines, ImagePlus, Landmark, Package, User } from "lucide-react";
 import type { Asset, AssetType } from "@/types/asset";
 import { GlassModal } from "@/components/ui/GlassModal";
 import { ModalCloseButton } from "@/components/ui/ModalCloseButton";
@@ -16,6 +16,7 @@ interface Props {
   mode: Mode;
   initialData?: Partial<Asset>;
   previewImageUrl?: string;
+  previewAudioUrl?: string;
   conflictWith?: Asset;
   onClose: () => void;
   onSubmit: (payload: {
@@ -23,6 +24,7 @@ interface Props {
     description: string;
     voice_style: string;
     image?: File | null;
+    audio?: File | null;
     overwrite?: boolean;
   }) => Promise<void>;
 }
@@ -34,16 +36,18 @@ const TYPE_ICON: Record<AssetType, React.ComponentType<{ className?: string }>> 
 };
 
 export function AssetFormModal({
-  type, mode, initialData, previewImageUrl, conflictWith, onClose, onSubmit,
+  type, mode, initialData, previewImageUrl, previewAudioUrl, conflictWith, onClose, onSubmit,
 }: Props) {
   const { t } = useTranslation("assets");
   const [name, setName] = useState(initialData?.name ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [voiceStyle, setVoiceStyle] = useState(initialData?.voice_style ?? "");
   const [image, setImage] = useState<File | null>(null);
+  const [audio, setAudio] = useState<File | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const titleId = useId();
 
@@ -77,7 +81,7 @@ export function AssetFormModal({
   const submit = async (overwrite = false) => {
     setSubmitting(true);
     try {
-      await onSubmit({ name: name.trim(), description, voice_style: voiceStyle, image, overwrite });
+      await onSubmit({ name: name.trim(), description, voice_style: voiceStyle, image, audio, overwrite });
       onClose();
     } finally {
       setSubmitting(false);
@@ -262,18 +266,48 @@ export function AssetFormModal({
             </FieldLabel>
 
             {isCharacter && (
-              <FieldLabel label={t("field.voice_style")}>
-                <input
-                  value={voiceStyle}
-                  onChange={(e) => setVoiceStyle(e.target.value)}
-                  className="focus-ring rounded-lg px-3 py-2 text-[13px] outline-none"
-                  style={{
-                    background: "oklch(0.16 0.010 265 / 0.6)",
-                    border: "1px solid var(--color-hairline)",
-                    color: "var(--color-text)",
-                  }}
-                />
-              </FieldLabel>
+              <>
+                <FieldLabel label={t("field.voice_style")}>
+                  <input
+                    value={voiceStyle}
+                    onChange={(e) => setVoiceStyle(e.target.value)}
+                    className="focus-ring rounded-lg px-3 py-2 text-[13px] outline-none"
+                    style={{
+                      background: "oklch(0.16 0.010 265 / 0.6)",
+                      border: "1px solid var(--color-hairline)",
+                      color: "var(--color-text)",
+                    }}
+                  />
+                </FieldLabel>
+
+                <FieldLabel label={t("field.voice_reference")}>
+                  <button
+                    type="button"
+                    onClick={() => audioRef.current?.click()}
+                    className="focus-ring flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-left text-[12.5px] outline-none transition-colors"
+                    style={{
+                      background: "oklch(0.16 0.010 265 / 0.6)",
+                      border: "1px dashed var(--color-hairline)",
+                      color: "var(--color-text-3)",
+                    }}
+                  >
+                    <AudioLines className="h-4 w-4 shrink-0 text-accent-2" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {audio?.name ?? (previewAudioUrl ? t("replace_audio") : t("upload_audio_optional"))}
+                    </span>
+                  </button>
+                  <input
+                    ref={audioRef}
+                    type="file"
+                    accept=".mp3,.wav,.m4a,.aac,.ogg,.flac,audio/*"
+                    className="hidden"
+                    onChange={(e) => setAudio(e.target.files?.[0] ?? null)}
+                  />
+                  {previewAudioUrl && !audio ? (
+                    <audio className="mt-2 h-8 w-full" src={previewAudioUrl} controls preload="metadata" />
+                  ) : null}
+                </FieldLabel>
+              </>
             )}
           </div>
         </div>

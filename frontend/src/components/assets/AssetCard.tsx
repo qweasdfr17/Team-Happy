@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { Edit2, Trash2, User as UserIcon, Landmark, Package } from "lucide-react";
+import { AudioLines, Edit2, Trash2, User as UserIcon, Landmark, Package } from "lucide-react";
 import { API } from "@/api";
 import { formatDate } from "@/utils/date-format";
 import type { Asset } from "@/types/asset";
@@ -22,6 +22,9 @@ function AssetCardImpl({ asset, onEdit, onDelete }: Props) {
   const { t, i18n } = useTranslation("assets");
   const Icon = TYPE_ICON[asset.type];
   const imageUrl = API.getGlobalAssetUrl(asset.image_path, asset.updated_at);
+  const audioUrl = asset.type === "character"
+    ? API.getGlobalAssetUrl(asset.audio_path, asset.updated_at)
+    : null;
   const formattedDate = asset.updated_at
     ? formatDate(asset.updated_at, i18n.language, SHORT_DATE_OPTS, "")
     : "";
@@ -48,6 +51,12 @@ function AssetCardImpl({ asset, onEdit, onDelete }: Props) {
                 {asset.description}
               </div>
             )}
+            {audioUrl ? (
+              <div className="mt-2 flex items-center gap-2 rounded-[6px] border border-hairline-soft bg-bg-grad-b/45 px-2 py-1">
+                <AudioLines className="h-3.5 w-3.5 shrink-0 text-accent-2" />
+                <audio className="h-7 min-w-0 flex-1" src={audioUrl} controls preload="metadata" />
+              </div>
+            ) : null}
             {formattedDate ? (
               <div className="mt-2 flex items-center gap-2 font-mono text-[10.5px] text-text-4">
                 <span className="tabular-nums">{t("meta_updated_at", { date: formattedDate })}</span>

@@ -141,23 +141,25 @@ export function AssetLibraryPage() {
   const ActiveIcon = TABS.find((tab) => tab.type === activeTab)!.icon;
 
   const handleSubmit = async (payload: {
-    name: string; description: string; voice_style: string; image?: File | null;
+    name: string; description: string; voice_style: string; image?: File | null; audio?: File | null;
   }) => {
     try {
       if (formModal?.mode === "edit" && formModal.asset) {
-        const { asset } = await API.updateAsset(formModal.asset.id, {
+        let { asset } = await API.updateAsset(formModal.asset.id, {
           name: payload.name, description: payload.description, voice_style: payload.voice_style,
         });
         if (payload.image) {
-          const { asset: after } = await API.replaceAssetImage(asset.id, payload.image);
-          updateAssetLocal(after);
-        } else {
-          updateAssetLocal(asset);
+          ({ asset } = await API.replaceAssetImage(asset.id, payload.image));
         }
+        if (payload.audio) {
+          ({ asset } = await API.replaceAssetAudio(asset.id, payload.audio));
+        }
+        updateAssetLocal(asset);
       } else {
         const { asset } = await API.createAsset({
           type: activeTab, name: payload.name, description: payload.description,
           voice_style: payload.voice_style, image: payload.image ?? undefined,
+          audio: activeTab === "character" ? payload.audio ?? undefined : undefined,
         });
         addAsset(asset);
       }
@@ -327,6 +329,11 @@ export function AssetLibraryPage() {
           previewImageUrl={
             formModal.asset
               ? API.getGlobalAssetUrl(formModal.asset.image_path, formModal.asset.updated_at) ?? undefined
+              : undefined
+          }
+          previewAudioUrl={
+            formModal.asset
+              ? API.getGlobalAssetUrl(formModal.asset.audio_path, formModal.asset.updated_at) ?? undefined
               : undefined
           }
           onClose={() => setFormModal(null)}

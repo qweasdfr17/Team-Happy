@@ -1996,13 +1996,14 @@ class API {
     return this.request<{ asset: Asset }>(`/assets/${encodeURIComponent(id)}`);
   }
 
-  static async createAsset(payload: AssetCreatePayload & { image?: File }) {
+  static async createAsset(payload: AssetCreatePayload & { image?: File; audio?: File }) {
     const form = new FormData();
     form.append("type", payload.type);
     form.append("name", payload.name);
     form.append("description", payload.description ?? "");
     form.append("voice_style", payload.voice_style ?? "");
     if (payload.image) form.append("image", payload.image);
+    if (payload.audio) form.append("audio", payload.audio);
     const url = `${API_BASE}/assets`;
     const response = await fetch(url, withAuth({ method: "POST", body: form }));
     if (!response.ok) {
@@ -2033,6 +2034,21 @@ class API {
         detail?: string;
       };
       throw new Error(typeof error.detail === "string" ? error.detail : "请求失败");
+    }
+    return response.json() as Promise<{ asset: Asset }>;
+  }
+
+  static async replaceAssetAudio(id: string, audio: File) {
+    const form = new FormData();
+    form.append("audio", audio);
+    const url = `${API_BASE}/assets/${encodeURIComponent(id)}/audio`;
+    const response = await fetch(url, withAuth({ method: "POST", body: form }));
+    if (!response.ok) {
+      handleUnauthorized(response);
+      const error = (await response.json().catch(() => ({ detail: response.statusText }))) as {
+        detail?: string;
+      };
+      throw new Error(typeof error.detail === "string" ? error.detail : "璇锋眰澶辫触");
     }
     return response.json() as Promise<{ asset: Asset }>;
   }

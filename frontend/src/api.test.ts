@@ -904,7 +904,7 @@ describe("API", () => {
   describe("createAsset", () => {
     it("POSTs multipart to /api/v1/assets", async () => {
       const fetchMock = vi.fn().mockResolvedValue(
-        mockResponse({ jsonData: { asset: { id: "x", type: "scene", name: "A", description: "", voice_style: "", image_path: null, source_project: null, updated_at: null } } }),
+        mockResponse({ jsonData: { asset: { id: "x", type: "scene", name: "A", description: "", voice_style: "", image_path: null, audio_path: null, source_project: null, updated_at: null } } }),
       );
       vi.stubGlobal("fetch", fetchMock);
       const res = await API.createAsset({ type: "scene", name: "A", description: "d" });
@@ -915,7 +915,7 @@ describe("API", () => {
   describe("addAssetFromProject", () => {
     it("POSTs /api/v1/assets/from-project", async () => {
       const fetchMock = vi.fn().mockResolvedValue(
-        mockResponse({ jsonData: { asset: { id: "x", type: "character", name: "王", description: "", voice_style: "", image_path: null, source_project: "demo", updated_at: null } } }),
+        mockResponse({ jsonData: { asset: { id: "x", type: "character", name: "王", description: "", voice_style: "", image_path: null, audio_path: null, source_project: "demo", updated_at: null } } }),
       );
       vi.stubGlobal("fetch", fetchMock);
       await API.addAssetFromProject({ project_name: "demo", resource_type: "character", resource_id: "王" });

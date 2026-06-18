@@ -47,7 +47,7 @@ describe("AssetFormModal", () => {
       <AssetFormModal
         type="character" mode="import"
         initialData={{ name: "王", description: "" }}
-        conflictWith={{ id: "1", type: "character", name: "王", description: "", voice_style: "", image_path: null, source_project: null, updated_at: null }}
+        conflictWith={{ id: "1", type: "character", name: "王", description: "", voice_style: "", image_path: null, audio_path: null, source_project: null, updated_at: null }}
         onClose={() => {}} onSubmit={vi.fn()}
       />
     );
@@ -67,5 +67,19 @@ describe("AssetFormModal", () => {
         onClose={() => {}} onSubmit={vi.fn()} />
     );
     expect(screen.queryByLabelText(/field\.voice_style/)).not.toBeInTheDocument();
+  });
+
+  it("shows voice reference upload only for character type", () => {
+    const { rerender } = render(
+      <AssetFormModal type="character" mode="create"
+        onClose={() => {}} onSubmit={vi.fn()} />
+    );
+    expect(screen.getByLabelText(/field\.voice_reference/)).toBeInTheDocument();
+
+    rerender(
+      <AssetFormModal type="prop" mode="create"
+        onClose={() => {}} onSubmit={vi.fn()} />
+    );
+    expect(screen.queryByLabelText(/field\.voice_reference/)).not.toBeInTheDocument();
   });
 });
