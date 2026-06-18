@@ -46,21 +46,25 @@ def _gather_unit_assets(
     project_scenes = (project.get("scenes") or {}) if isinstance(project.get("scenes"), dict) else {}
     project_props = (project.get("props") or {}) if isinstance(project.get("props"), dict) else {}
 
+    def _sheet(bucket: dict, name: str, field: str) -> str:
+        entry = bucket.get(name)
+        return entry.get(field, "") if isinstance(entry, dict) else ""
+
+    def _add_asset(ref_type: str, name: str) -> None:
+        if ref_type == "character" and name in project_chars and name not in chars:
+            chars[name] = _sheet(project_chars, name, "character_sheet")
+        elif ref_type == "scene" and name in project_scenes and name not in scs:
+            scs[name] = _sheet(project_scenes, name, "scene_sheet")
+        elif ref_type == "prop" and name in project_props and name not in prps:
+            prps[name] = _sheet(project_props, name, "prop_sheet")
+
     # 主要来源：unit.references
     for ref in unit.get("references") or []:
         if not isinstance(ref, dict):
             continue
         rtype = ref.get("type", "")
         rname = ref.get("name", "")
-        if rtype == "character" and rname in project_chars:
-            sheet = project_chars[rname].get("character_sheet", "") if isinstance(project_chars[rname], dict) else ""
-            chars[rname] = sheet
-        elif rtype == "scene" and rname in project_scenes:
-            sheet = project_scenes[rname].get("scene_sheet", "") if isinstance(project_scenes[rname], dict) else ""
-            scs[rname] = sheet
-        elif rtype == "prop" and rname in project_props:
-            sheet = project_props[rname].get("prop_sheet", "") if isinstance(project_props[rname], dict) else ""
-            prps[rname] = sheet
+        _add_asset(rtype, rname)
 
     # 补充：扫 shot.text 中的 @mention
     mention_re = re.compile(r"@\[([^\]]+)\]|@([\w一-鿿]+)")
@@ -72,21 +76,45 @@ def _gather_unit_assets(
             name = m.group(1) or m.group(2)
             if not name:
                 continue
-            if name in project_chars and name not in chars:
-                sheet = project_chars[name].get("character_sheet", "") if isinstance(project_chars[name], dict) else ""
-                chars[name] = sheet
-            elif name in project_scenes and name not in scs:
-                sheet = project_scenes[name].get("scene_sheet", "") if isinstance(project_scenes[name], dict) else ""
-                scs[name] = sheet
-            elif name in project_props and name not in prps:
-                sheet = project_props[name].get("prop_sheet", "") if isinstance(project_props[name], dict) else ""
-                prps[name] = sheet
+            if name in project_chars:
+                _add_asset("character", name)
+            elif name in project_scenes:
+                _add_asset("scene", name)
+            elif name in project_props:
+                _add_asset("prop", name)
+
+    # 兜底：LLM 有时直接写资产名而不写 references/@mention；开头声明仍需绑定这些资产。
+    plain_candidates: list[tuple[str, str]] = []
+    for ref_type, bucket in (("character", project_chars), ("scene", project_scenes), ("prop", project_props)):
+        for name in bucket:
+            if isinstance(name, str) and name.strip():
+                plain_candidates.append((ref_type, name))
+    plain_candidates.sort(key=lambda item: len(item[1]), reverse=True)
+    for shot in unit.get("shots") or []:
+        if not isinstance(shot, dict):
+            continue
+        text = " ".join(str(shot.get(key) or "") for key in ("text", "video_prompt", "voiceover_text"))
+        for ref_type, name in plain_candidates:
+            if name in text:
+                _add_asset(ref_type, name)
 
     return (
         [(n, chars[n]) for n in chars],
         [(n, scs[n]) for n in scs],
         [(n, prps[n]) for n in prps],
     )
+
+
+def _references_from_assets(
+    characters: list[tuple[str, str]],
+    scenes: list[tuple[str, str]],
+    props: list[tuple[str, str]],
+) -> list[dict[str, str]]:
+    refs: list[dict[str, str]] = []
+    for ref_type, assets in (("character", characters), ("scene", scenes), ("prop", props)):
+        for name, _sheet in assets:
+            refs.append({"type": ref_type, "name": name})
+    return refs
 
 
 def _format_aspect_ratio(aspect_ratio: str) -> str:
@@ -116,6 +144,7 @@ _INLINE_IMG_REF_RE = re.compile(
     r"\s*\d+\s*[】\]]?",
     re.IGNORECASE,
 )
+_INLINE_MENTION_REF_RE = re.compile(r"(?<!\w)@\[([^\]\r\n]+)\]|(?<!\w)@([A-Za-z0-9_\u4e00-\u9fff]+)")
 
 
 def _strip_inline_image_refs(text: str) -> str:
@@ -134,6 +163,31 @@ def _strip_inline_image_refs(text: str) -> str:
     # 压缩多余空白
     cleaned = re.sub(r"[ \t]+", " ", cleaned)
     return cleaned.strip()
+
+
+def _strip_inline_asset_mentions(text: str) -> str:
+    """移除切片段正文里的 @mention 引用语法，只保留资产名。
+
+    图片/资产引用只应出现在开头【图片引用声明】中，正文保留可读资产名即可。
+
+    >>> _strip_inline_asset_mentions("@[近地轨道] 黑屏后 @[凯尔] 抬头")
+    '近地轨道 黑屏后 凯尔 抬头'
+    >>> _strip_inline_asset_mentions("@凯尔 看向 @叶琳")
+    '凯尔 看向 叶琳'
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        return match.group(1) or match.group(2) or ""
+
+    cleaned = _INLINE_MENTION_REF_RE.sub(_replace, text)
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    return cleaned.strip()
+
+
+def _clean_slice_text(text: str) -> str:
+    cleaned = _strip_inline_image_refs(text)
+    cleaned = _strip_inline_asset_mentions(cleaned)
+    return cleaned
 
 
 def _compress_blank_lines(text: str) -> str:
@@ -224,11 +278,11 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
             continue
         sidx = si + 1
         raw_text = shot.get("text", "") or shot.get("video_prompt", "") or ""
-        # 清理行内图片编号引用，只保留资产名
-        text = _strip_inline_image_refs(raw_text) if raw_text else ""
+        # 清理行内图片编号与 @mention 引用语法，只保留资产名。
+        text = _clean_slice_text(raw_text) if raw_text else ""
         duration = shot.get("duration", 5)
         voiceover_raw = shot.get("voiceover_text", "")
-        voiceover = _strip_inline_image_refs(voiceover_raw) if voiceover_raw else ""
+        voiceover = _clean_slice_text(voiceover_raw) if voiceover_raw else ""
 
         slice_sections.append(
             f"【切片段{sidx}】\n"
@@ -309,6 +363,8 @@ def apply_premium_prompt_to_unit(unit: dict, project: dict) -> dict:
         # 回退：从原 shots 求和
         total_duration = sum(int(s.get("duration", 5)) for s in (unit.get("shots") or []) if isinstance(s, dict))
 
+    characters, scenes, props = _gather_unit_assets(unit, project)
+    gathered_refs = _references_from_assets(characters, scenes, props)
     prompt = render_unit_prompt_premium(unit, project)
 
     # 替换为单 shot：duration = 原总时长，text = 精品提示词全文
@@ -324,6 +380,8 @@ def apply_premium_prompt_to_unit(unit: dict, project: dict) -> dict:
     inferred = infer_references_from_prompt_text(project, prompt)
     if inferred:
         unit["references"] = inferred
+    elif gathered_refs:
+        unit["references"] = gathered_refs
     elif not old_refs:
         unit["references"] = []
 

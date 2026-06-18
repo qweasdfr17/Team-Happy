@@ -2,6 +2,7 @@
 
 from lib.reference_video.premium_prompt import (
     _compress_blank_lines,
+    _strip_inline_asset_mentions,
     _strip_inline_image_refs,
     apply_premium_prompt_to_unit,
     render_unit_prompt_premium,
@@ -272,13 +273,29 @@ class TestStripInlineImageRefs:
         assert _strip_inline_image_refs("图片1") == ""
 
 
+class TestStripInlineAssetMentions:
+    """_strip_inline_asset_mentions 清理切片段正文里的 @mention 引用语法。"""
+
+    def test_strips_wrapped_mentions(self):
+        assert _strip_inline_asset_mentions("@[近地轨道] 黑屏后 @[凯尔] 抬头") == "近地轨道 黑屏后 凯尔 抬头"
+
+    def test_strips_legacy_mentions(self):
+        assert _strip_inline_asset_mentions("@凯尔 看向 @叶琳") == "凯尔 看向 叶琳"
+
+    def test_keeps_email_like_text(self):
+        assert _strip_inline_asset_mentions("contact test@example.com") == "contact test@example.com"
+
+
 class TestNoInlineRefsInSliceSections:
     """切片段和场景设计中不应出现行内图片编号。"""
 
     @staticmethod
     def _project_with_kyle() -> dict:
         return {
-            "characters": {"凯尔": {"description": "主角", "character_sheet": "chars/凯尔.png"}},
+            "characters": {
+                "凯尔": {"description": "主角", "character_sheet": "chars/凯尔.png"},
+                "叶琳": {"description": "配角", "character_sheet": "chars/叶琳.png"},
+            },
             "scenes": {"近地轨道": {"description": "太空站", "scene_sheet": "scenes/轨道.png"}},
             "props": {"D-77空港": {"description": "空港", "prop_sheet": "props/空港.png"}},
             "style": "写实",
@@ -291,10 +308,11 @@ class TestNoInlineRefsInSliceSections:
             "shots": [
                 {"text": "图片1：凯尔 立于[图2]近地轨道", "duration": 3},
                 {"text": "I图片1 晋图片3 D-77空港 停靠", "duration": 3},
-                {"text": "凯尔 走向!图片2 控制台", "duration": 2},
+                {"text": "凯尔 走向!图片2 控制台，叶琳跟随", "duration": 2},
             ],
             "references": [
                 {"type": "character", "name": "凯尔"},
+                {"type": "character", "name": "叶琳"},
                 {"type": "scene", "name": "近地轨道"},
                 {"type": "prop", "name": "D-77空港"},
             ],
@@ -305,8 +323,54 @@ class TestNoInlineRefsInSliceSections:
         """开头【图片引用声明】保留。"""
         prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
         assert "图片1：凯尔" in prompt
-        assert "图片2：近地轨道" in prompt
-        assert "图片3：D-77空港" in prompt
+        assert "图片2：叶琳" in prompt
+        assert "图片3：近地轨道" in prompt
+        assert "图片4：D-77空港" in prompt
+
+    def test_header_infers_plain_asset_names_without_refs_or_mentions(self):
+        """references/@mention 都缺失时，开头仍从普通资产名推断图片声明。"""
+        unit = {
+            "unit_id": "E1U01",
+            "shots": [
+                {"text": "近地轨道 黑屏后舰队残骸坠落", "duration": 5},
+                {"text": "镜头急速坠入被炸毁的 D-77空港", "duration": 4},
+                {"text": "凯尔 抬头看向 叶琳", "duration": 5},
+            ],
+            "references": [],
+            "duration_seconds": 14,
+        }
+        prompt = render_unit_prompt_premium(unit, self._project_with_kyle())
+        header = prompt.split("【全局视频要求】", 1)[0]
+        assert "图片1：凯尔" in header
+        assert "图片2：叶琳" in header
+        assert "图片3：近地轨道" in header
+        assert "图片4：D-77空港" in header
+        assert "图片1：（无资产）" not in header
+
+    def test_apply_writes_references_from_plain_asset_names(self):
+        """普通资产名兜底不仅写开头声明，也同步写入 unit.references。"""
+        unit = {
+            "unit_id": "E1U01",
+            "shots": [
+                {"text": "近地轨道 黑屏后舰队残骸坠落", "duration": 5},
+                {"text": "镜头急速坠入被炸毁的 D-77空港", "duration": 4},
+                {"text": "凯尔 抬头看向 叶琳", "duration": 5},
+            ],
+            "references": [],
+            "duration_seconds": 14,
+        }
+        apply_premium_prompt_to_unit(unit, self._project_with_kyle())
+        header = unit["shots"][0]["text"].split("【全局视频要求】", 1)[0]
+        assert "图片1：凯尔" in header
+        assert "图片2：叶琳" in header
+        assert "图片3：近地轨道" in header
+        assert "图片4：D-77空港" in header
+        assert unit["references"] == [
+            {"type": "character", "name": "凯尔"},
+            {"type": "character", "name": "叶琳"},
+            {"type": "scene", "name": "近地轨道"},
+            {"type": "prop", "name": "D-77空港"},
+        ]
 
     def test_slice_sections_have_no_image_numbers(self):
         """切片段中不包含任何图片编号。"""
@@ -316,6 +380,7 @@ class TestNoInlineRefsInSliceSections:
         assert "图片1" not in after_header
         assert "图片2" not in after_header
         assert "图片3" not in after_header
+        assert "图片4" not in after_header
         assert "[图1]" not in after_header
         assert "[图2]" not in after_header
         assert "I图片1" not in after_header
@@ -327,8 +392,27 @@ class TestNoInlineRefsInSliceSections:
         prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
         after_header = prompt.split("【全局视频要求】", 1)[1] if "【全局视频要求】" in prompt else prompt
         assert "凯尔" in after_header
+        assert "叶琳" in after_header
         assert "近地轨道" in after_header
         assert "D-77空港" in after_header
+
+    def test_slice_sections_have_no_mentions(self):
+        """切片段正文只保留资产名，不保留 @ 引用语法。"""
+        unit = self._unit_with_polluted_text()
+        unit["shots"] = [
+            {"text": "@[近地轨道] 黑屏后舰队残骸坠落", "duration": 5},
+            {"text": "镜头急速坠入被炸毁的 @[D-77空港]", "duration": 4},
+            {"text": "@[凯尔] 抬头看向 @叶琳", "duration": 5, "voiceover_text": "@凯尔 低声呼喊"},
+        ]
+        prompt = render_unit_prompt_premium(unit, self._project_with_kyle())
+        after_header = prompt.split("【全局视频要求】", 1)[1] if "【全局视频要求】" in prompt else prompt
+        assert "@[" not in after_header
+        assert "@凯尔" not in after_header
+        assert "@叶琳" not in after_header
+        assert "近地轨道 黑屏后舰队残骸坠落" in after_header
+        assert "D-77空港" in after_header
+        assert "凯尔 抬头看向 叶琳" in after_header
+        assert "凯尔 低声呼喊" in after_header
 
     def test_references_still_inferred(self):
         """清理 inline refs 后 references 推断仍成功。"""
@@ -336,6 +420,7 @@ class TestNoInlineRefsInSliceSections:
         apply_premium_prompt_to_unit(unit, self._project_with_kyle())
         ref_names = {(r["type"], r["name"]) for r in unit["references"]}
         assert ("character", "凯尔") in ref_names
+        assert ("character", "叶琳") in ref_names
         assert ("scene", "近地轨道") in ref_names
         assert ("prop", "D-77空港") in ref_names
 
