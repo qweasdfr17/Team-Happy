@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from lib.asset_types import BUCKET_KEY
@@ -106,6 +107,44 @@ def _format_aspect_ratio(aspect_ratio: str) -> str:
     return ratio
 
 
+# 匹配行内图片编号引用（不含开头的【图片引用声明】格式），
+# 用于清理切片段/画面描述中不应出现的图片编号。
+# 覆盖：图片1 / 图片 1 / 图1 / [图1] / 【图1】 / I图片1 / 晋图片3 / !图片2 / 1图片4 / #图片1
+_INLINE_IMG_REF_RE = re.compile(
+    r"[A-Za-z0-9一-鿿ＩＩI!！#【\[]*"
+    r"(?:图片|图|image|img|\[图|【图)"
+    r"\s*\d+\s*[】\]]?",
+    re.IGNORECASE,
+)
+
+
+def _strip_inline_image_refs(text: str) -> str:
+    """移除行内图片编号引用，保留资产名。
+
+    >>> _strip_inline_image_refs("图片1：凯尔立于近地轨道")
+    '凯尔立于近地轨道'
+    >>> _strip_inline_image_refs("[图1] 萧近宸 推门而入")
+    '萧近宸 推门而入'
+    >>> _strip_inline_image_refs("I图片1 晋图片3")
+    ''
+    """
+    cleaned = _INLINE_IMG_REF_RE.sub("", text)
+    # 移除可能残留的冒号、破折号、空白前缀
+    cleaned = re.sub(r"^[\s：:—\-]+", "", cleaned)
+    # 压缩多余空白
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    return cleaned.strip()
+
+
+def _compress_blank_lines(text: str) -> str:
+    """压缩连续 3+ 个换行为最多两个（段落间最多一个空行）。
+
+    >>> _compress_blank_lines("a\\n\\n\\nb")
+    'a\\n\\nb'
+    """
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
 def _resolve_project_style(project: dict, explicit_style: str = "") -> tuple[str, str]:
     """从 project.json 读取画风/风格，不硬编码默认画风。
 
@@ -184,9 +223,12 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
         if not isinstance(shot, dict):
             continue
         sidx = si + 1
-        text = shot.get("text", "") or shot.get("video_prompt", "") or ""
+        raw_text = shot.get("text", "") or shot.get("video_prompt", "") or ""
+        # 清理行内图片编号引用，只保留资产名
+        text = _strip_inline_image_refs(raw_text) if raw_text else ""
         duration = shot.get("duration", 5)
-        voiceover = shot.get("voiceover_text", "")
+        voiceover_raw = shot.get("voiceover_text", "")
+        voiceover = _strip_inline_image_refs(voiceover_raw) if voiceover_raw else ""
 
         slice_sections.append(
             f"【切片段{sidx}】\n"
@@ -243,6 +285,8 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
 禁止出现现代元素（与世界观冲突的物体/服装/建筑）。
 """
 
+    # 压缩连续 3+ 空行 → 最多一个空行
+    prompt = _compress_blank_lines(prompt)
     return prompt
 
 

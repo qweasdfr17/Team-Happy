@@ -1,6 +1,11 @@
 """premium_prompt 单元测试。"""
 
-from lib.reference_video.premium_prompt import apply_premium_prompt_to_unit, render_unit_prompt_premium
+from lib.reference_video.premium_prompt import (
+    _compress_blank_lines,
+    _strip_inline_image_refs,
+    apply_premium_prompt_to_unit,
+    render_unit_prompt_premium,
+)
 
 
 def _project() -> dict:
@@ -236,3 +241,124 @@ class TestStyleFromProject:
         assert "图片1：萧近宸" in prompt
         assert "图片2：王府书房" in prompt
         assert "图片3：话本" in prompt
+
+
+class TestStripInlineImageRefs:
+    """_strip_inline_image_refs 清理各种污染格式。"""
+
+    def test_strips_basic_image_number(self):
+        assert _strip_inline_image_refs("图片1：凯尔立于近地轨道") == "凯尔立于近地轨道"
+
+    def test_strips_bracket_format(self):
+        assert _strip_inline_image_refs("[图1] 萧近宸推门而入") == "萧近宸推门而入"
+
+    def test_strips_double_bracket(self):
+        assert _strip_inline_image_refs("【图1】萧近宸") == "萧近宸"
+
+    def test_strips_polluted_prefix(self):
+        assert _strip_inline_image_refs("I图片1 凯尔") == "凯尔"
+        assert _strip_inline_image_refs("晋图片3 D-77空港") == "D-77空港"
+        assert _strip_inline_image_refs("!图片2 近地轨道") == "近地轨道"
+        assert _strip_inline_image_refs("#图片1") == ""
+        assert _strip_inline_image_refs("1图片4 话本") == "话本"
+
+    def test_preserves_asset_name(self):
+        """清理后保留资产名。"""
+        assert "凯尔" in _strip_inline_image_refs("图片1：凯尔 立于近地轨道")
+        assert "近地轨道" in _strip_inline_image_refs("图片2：近地轨道 太空站")
+
+    def test_empty_on_pure_ref(self):
+        """纯图片编号无内容时返回空。"""
+        assert _strip_inline_image_refs("图片1") == ""
+
+
+class TestNoInlineRefsInSliceSections:
+    """切片段和场景设计中不应出现行内图片编号。"""
+
+    @staticmethod
+    def _project_with_kyle() -> dict:
+        return {
+            "characters": {"凯尔": {"description": "主角", "character_sheet": "chars/凯尔.png"}},
+            "scenes": {"近地轨道": {"description": "太空站", "scene_sheet": "scenes/轨道.png"}},
+            "props": {"D-77空港": {"description": "空港", "prop_sheet": "props/空港.png"}},
+            "style": "写实",
+            "style_description": "",
+        }
+
+    def _unit_with_polluted_text(self) -> dict:
+        return {
+            "unit_id": "E1U01",
+            "shots": [
+                {"text": "图片1：凯尔 立于[图2]近地轨道", "duration": 3},
+                {"text": "I图片1 晋图片3 D-77空港 停靠", "duration": 3},
+                {"text": "凯尔 走向!图片2 控制台", "duration": 2},
+            ],
+            "references": [
+                {"type": "character", "name": "凯尔"},
+                {"type": "scene", "name": "近地轨道"},
+                {"type": "prop", "name": "D-77空港"},
+            ],
+            "duration_seconds": 8,
+        }
+
+    def test_header_has_image_declarations(self):
+        """开头【图片引用声明】保留。"""
+        prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
+        assert "图片1：凯尔" in prompt
+        assert "图片2：近地轨道" in prompt
+        assert "图片3：D-77空港" in prompt
+
+    def test_slice_sections_have_no_image_numbers(self):
+        """切片段中不包含任何图片编号。"""
+        prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
+        # 取【图片引用声明】之后的内容
+        after_header = prompt.split("【全局视频要求】", 1)[1] if "【全局视频要求】" in prompt else prompt
+        assert "图片1" not in after_header
+        assert "图片2" not in after_header
+        assert "图片3" not in after_header
+        assert "[图1]" not in after_header
+        assert "[图2]" not in after_header
+        assert "I图片1" not in after_header
+        assert "晋图片3" not in after_header
+        assert "!图片2" not in after_header
+
+    def test_asset_names_preserved_in_slices(self):
+        """切片段中保留资产名。"""
+        prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
+        after_header = prompt.split("【全局视频要求】", 1)[1] if "【全局视频要求】" in prompt else prompt
+        assert "凯尔" in after_header
+        assert "近地轨道" in after_header
+        assert "D-77空港" in after_header
+
+    def test_references_still_inferred(self):
+        """清理 inline refs 后 references 推断仍成功。"""
+        unit = self._unit_with_polluted_text()
+        apply_premium_prompt_to_unit(unit, self._project_with_kyle())
+        ref_names = {(r["type"], r["name"]) for r in unit["references"]}
+        assert ("character", "凯尔") in ref_names
+        assert ("scene", "近地轨道") in ref_names
+        assert ("prop", "D-77空港") in ref_names
+
+
+class TestBlankLineCompression:
+    """空行压缩：最多连续两个换行。"""
+
+    def test_compresses_three_newlines(self):
+        assert "\n\n\n" not in _compress_blank_lines("a\n\n\nb")
+
+    def test_preserves_single_blank_line(self):
+        result = _compress_blank_lines("a\n\nb")
+        assert "\n\n" in result
+
+    def test_prompt_has_no_triple_newlines(self):
+        """最终 prompt 不含连续 3 个换行。"""
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), _project())
+        assert "\n\n\n" not in prompt
+
+    def test_sections_separated_by_one_blank_line(self):
+        """各 section 之间最多一个空行。"""
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), _project())
+        # 统计连续空行数
+        import re
+        max_blank = max((len(m.group(0)) for m in re.finditer(r"\n+", prompt)), default=0)
+        assert max_blank <= 2  # 最多 \n\n
