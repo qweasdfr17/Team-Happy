@@ -10,6 +10,7 @@ import pytest
 from lib.reference_video.errors import MissingReferenceError
 from server.services.reference_video_tasks import (
     _apply_provider_constraints,
+    _merge_inferred_references,
     _render_unit_prompt,
     _resolve_unit_references,
 )
@@ -156,6 +157,42 @@ def test_render_unit_prompt_replaces_mentions_in_order():
     # Shot header 保留
     assert "Shot 1 (3s):" in rendered
     assert "Shot 2 (5s):" in rendered
+
+
+def test_render_unit_prompt_appends_reference_legend_without_mentions():
+    """精品提示词正文不写 @ 时，backend prompt 仍追加 [图N] 对照表。"""
+    unit = {
+        "shots": [
+            {
+                "duration": 14,
+                "text": (
+                    "【图片引用声明】\n"
+                    "图片1：张三\n"
+                    "图片2：酒馆\n\n"
+                    "【切片段1】\n"
+                    "画面：张三站在酒馆门口"
+                ),
+            }
+        ],
+        "references": [
+            {"type": "character", "name": "张三"},
+            {"type": "scene", "name": "酒馆"},
+        ],
+    }
+    rendered = _render_unit_prompt(unit)
+    assert "图片1：张三" in rendered
+    assert "[图1] 角色「张三」设计图" in rendered
+    assert "[图2] 场景「酒馆」设计图" in rendered
+    assert "@张三" not in rendered
+
+
+def test_merge_inferred_references_keeps_existing_unmentioned_refs():
+    inferred = [{"type": "character", "name": "张三"}]
+    existing = [{"type": "character", "name": "张三"}, {"type": "scene", "name": "酒馆"}]
+    assert _merge_inferred_references(inferred, existing) == [
+        {"type": "character", "name": "张三"},
+        {"type": "scene", "name": "酒馆"},
+    ]
 
 
 def test_apply_provider_constraints_veo_clamps_duration_and_refs():

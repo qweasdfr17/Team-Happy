@@ -92,7 +92,33 @@ def _render_unit_prompt(unit: dict) -> str:
     rendered = render_prompt_for_backend(raw, references)
     if not rendered.strip():
         raise ValueError("reference video unit prompt is empty: all shots[*].text are blank")
+    labels = [
+        f"{ASSET_SPECS.get(ref.type).label_zh if ref.type in ASSET_SPECS else ref.type}「{ref.name}」设计图"
+        for ref in references
+    ]
+    legend = render_reference_legend(labels)
+    if legend:
+        rendered = f"{rendered}\n\n{legend}"
     return append_video_negative_tail(rendered)
+
+
+def _merge_inferred_references(inferred: list[dict], existing: list[dict]) -> list[dict]:
+    """推断引用排前，旧引用中未覆盖的继续保留，避免部分推断误删参考图。"""
+    merged: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for ref in [*inferred, *existing]:
+        if not isinstance(ref, dict):
+            continue
+        rtype = ref.get("type")
+        rname = ref.get("name")
+        if not isinstance(rtype, str) or not isinstance(rname, str) or not rtype or not rname:
+            continue
+        key = (rtype, rname)
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append({"type": rtype, "name": rname})
+    return merged
 
 
 def _apply_provider_constraints(
@@ -334,10 +360,11 @@ async def execute_reference_video_task(
         # 成品提示词中"图1/图2"声明不一致导致参考图错位
         raw_prompt = assemble_shots_text(unit.get("shots") or [])
         inferred = infer_references_from_prompt_text(project, raw_prompt) if raw_prompt else []
-        effective_refs = inferred if inferred else (unit.get("references") or [])
+        existing_refs = unit.get("references") or []
+        effective_refs = _merge_inferred_references(inferred, existing_refs) if inferred else existing_refs
         source_refs = _resolve_unit_references(project, project_path, effective_refs)
         # 如果是推断出来的引用，写回脚本 JSON 使 UI 红框同步显示
-        if inferred and effective_refs != (unit.get("references") or []):
+        if inferred and effective_refs != existing_refs:
             unit["references"] = effective_refs
             try:
                 pm = get_project_manager()
