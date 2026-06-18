@@ -149,3 +149,90 @@ class TestRenderPremiumPrompt:
         idx_study = prompt.index("图片2：王府书房")
         idx_book = prompt.index("图片3：话本")
         assert idx_xiao < idx_study < idx_book
+
+
+class TestAspectRatioFromProject:
+    """比例必须从 project.json 读取，不硬编码。"""
+
+    def test_16_9_project_outputs_landscape(self):
+        project = _project()
+        project["aspect_ratio"] = "16:9"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "横屏 16:9" in prompt
+        assert "竖屏" not in prompt
+
+    def test_9_16_project_outputs_portrait(self):
+        project = _project()
+        project["aspect_ratio"] = "9:16"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "竖屏 9:16" in prompt
+
+    def test_custom_ratio_no_prefix(self):
+        """1:1 等非标比例不加横屏/竖屏前缀。"""
+        project = _project()
+        project["aspect_ratio"] = "1:1"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "1:1" in prompt
+        assert "横屏" not in prompt
+        assert "竖屏" not in prompt
+
+    def test_explicit_aspect_ratio_overrides_project(self):
+        project = _project()
+        project["aspect_ratio"] = "9:16"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project, aspect_ratio="16:9")
+        assert "横屏 16:9" in prompt
+        assert "竖屏" not in prompt
+
+    def test_aspect_ratio_dict_fallback(self):
+        """aspect_ratio 为 dict 时从 video key 读取。"""
+        project = _project()
+        project["aspect_ratio"] = {"video": "16:9", "storyboard": "9:16"}
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "横屏 16:9" in prompt
+
+
+class TestStyleFromProject:
+    """画风/风格必须从 project.json 读取，不硬编码模板默认值。"""
+
+    def test_project_style_appears_in_prompt(self):
+        project = _project()
+        project["style"] = "电影感写实"
+        project["style_description"] = "冷色调，柔光，胶片颗粒"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "电影感写实" in prompt
+        assert "冷色调" in prompt
+
+    def test_no_style_no_fallback_3d_cg(self):
+        """项目未设置 style 时不硬塞 3D CG 等画风词。"""
+        project = _project()
+        project.pop("style", None)
+        project.pop("style_description", None)
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "3D" not in prompt
+        assert "CG" not in prompt
+        # "流畅动画" 中的"动画"是质量描述词而非画风，不在此断言
+
+    def test_3d_cg_only_when_project_says_so(self):
+        """仅当项目 style 包含 3D/CG 时才出现对应词。"""
+        project = _project()
+        project["style"] = "3D CG"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "3D CG" in prompt
+
+    def test_explicit_style_overrides_project(self):
+        project = _project()
+        project["style"] = "水墨"
+        project.pop("style_description", None)  # 清除 _project() 默认的"水墨渲染风格"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project, style="赛博朋克")
+        assert "赛博朋克" in prompt
+        assert "水墨" not in prompt
+
+    def test_references_unaffected_by_style_change(self):
+        """图片引用声明不受比例/画风修改影响。"""
+        project = _project()
+        project["aspect_ratio"] = "21:9"
+        project["style"] = "黑白默片"
+        prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
+        assert "图片1：萧近宸" in prompt
+        assert "图片2：王府书房" in prompt
+        assert "图片3：话本" in prompt

@@ -88,27 +88,94 @@ def _gather_unit_assets(
     )
 
 
-def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", aspect_ratio: str = "9:16") -> str:
+def _format_aspect_ratio(aspect_ratio: str) -> str:
+    """将比例值转为带方向的展示文本，不硬编码竖屏/横屏。
+
+    >>> _format_aspect_ratio("9:16")
+    '竖屏 9:16'
+    >>> _format_aspect_ratio("16:9")
+    '横屏 16:9'
+    >>> _format_aspect_ratio("1:1")
+    '1:1'
+    """
+    ratio = aspect_ratio.strip()
+    if ratio == "9:16":
+        return "竖屏 9:16"
+    if ratio == "16:9":
+        return "横屏 16:9"
+    return ratio
+
+
+def _resolve_project_style(project: dict, explicit_style: str = "") -> tuple[str, str]:
+    """从 project.json 读取画风/风格，不硬编码默认画风。
+
+    Returns:
+        (style_label, style_description): 若项目未设置 style，返回空串而非模板默认值。
+    """
+    style_label = explicit_style.strip() if explicit_style else ""
+    if not style_label:
+        raw = project.get("style")
+        if isinstance(raw, str) and raw.strip():
+            style_label = raw.strip()
+    style_desc = ""
+    raw_desc = project.get("style_description")
+    if isinstance(raw_desc, str) and raw_desc.strip():
+        style_desc = raw_desc.strip()
+    return style_label, style_desc
+
+
+def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", aspect_ratio: str = "") -> str:
     """构建精品提示词文本（9 段式模板）。
+
+    所有画风/比例/风格均从 project.json 读取，不硬编码模板默认值。
 
     Args:
         unit: video_units[] 条目，含 shots / references / duration_seconds
         project: project.json dict
-        style: 视觉风格标签
-        aspect_ratio: 画面比例
+        style: 调用方显式传入的视觉风格标签（优先级高于 project.json）
+        aspect_ratio: 调用方显式传入的画面比例（优先级高于 project.json）
 
     Returns:
         精品提示词全文
     """
     characters, scenes, props = _gather_unit_assets(unit, project)
-    all_assets = [*characters, *scenes, *props]
-    all_names = [n for n, _ in all_assets]
 
     # ── 图片引用声明 ──
     img_lines: list[str] = []
-    for i, (name, _sheet) in enumerate(all_assets, 1):
+    for i, (name, _sheet) in enumerate(characters + scenes + props, 1):
         img_lines.append(f"图片{i}：{name}")
     img_section = "\n".join(img_lines) if img_lines else "图片1：（无资产）"
+
+    # ── 比例：从 project 读取，调用方显式传入优先 ──
+    resolved_ratio = aspect_ratio.strip() if aspect_ratio else ""
+    if not resolved_ratio:
+        raw = project.get("aspect_ratio")
+        if isinstance(raw, str) and raw.strip():
+            resolved_ratio = raw.strip()
+    # 一级项目 aspect_ratio 未设置时，从 sub-dict 读取（某些项目结构）
+    if not resolved_ratio:
+        ar_dict = project.get("aspect_ratio")
+        if isinstance(ar_dict, dict):
+            for key in ("video", "storyboard", "characters"):
+                v = ar_dict.get(key)
+                if isinstance(v, str) and v.strip():
+                    resolved_ratio = v.strip()
+                    break
+    if not resolved_ratio:
+        resolved_ratio = "16:9"  # 最终回退：横屏（视频最常用）
+
+    ratio_display = _format_aspect_ratio(resolved_ratio)
+
+    # ── 风格：从 project 读取，不硬编码 ──
+    style_label, style_desc = _resolve_project_style(project, style)
+
+    # 构建风格行：有 label 写 label，有 desc 追加
+    style_parts: list[str] = []
+    if style_label:
+        style_parts.append(style_label)
+    if style_desc:
+        style_parts.append(style_desc)
+    style_line = "。".join(style_parts) if style_parts else ""
 
     # ── 切片段 ──
     shots = unit.get("shots") or []
@@ -120,20 +187,10 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
         text = shot.get("text", "") or shot.get("video_prompt", "") or ""
         duration = shot.get("duration", 5)
         voiceover = shot.get("voiceover_text", "")
-        chars_in = shot.get("characters_in_shot") or []
-        scenes_in = shot.get("scenes") or []
-        props_in = shot.get("props") or []
-
-        char_str = "、".join(chars_in) if chars_in else "无"
-        scene_str = "、".join(scenes_in) if scenes_in else "无"
-        prop_str = "、".join(props_in) if props_in else "无"
 
         slice_sections.append(
             f"【切片段{sidx}】\n"
             f"时长：{duration}s\n"
-            f"出场角色：{char_str}\n"
-            f"场景：{scene_str}\n"
-            f"道具：{prop_str}\n"
             f"画面：{text}\n"
             f"运镜：镜头平稳推进，跟随主体运动\n"
             f"对白：{voiceover if voiceover else '无对白'}\n"
@@ -152,19 +209,20 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
         if isinstance(first_scene, dict):
             scene_desc = first_scene.get("description", "")
 
-    # ── 风格 ──
-    style_label = style or project.get("style", "") or "写实"
-    style_desc = project.get("style_description", "") or ""
+    # 全局要求行：仅包含项目配置中存在的字段
+    global_lines: list[str] = []
+    if style_line:
+        global_lines.append(style_line + "。")
+    global_lines.append(f"{ratio_display}，多场景，多角度，60fps 流畅动画。")
+    global_lines.append("有环境音和动作音效，无音乐，无字幕，不出现任何文字、水印、Logo。")
+    global_lines.append("中文对白，人物动作流畅，运镜丝滑。")
+    global_lines.append("0s-0.15s 作为废帧缓冲，不安排关键动作、关键表情和关键对白。")
 
     prompt = f"""【图片引用声明】
 {img_section}
 
 【全局视频要求】
-{style_label}。{style_desc}
-竖屏，{aspect_ratio}，多场景，多角度，60fps 流畅动画。
-有环境音和动作音效，无音乐，无字幕，不出现任何文字、水印、Logo。
-中文对白，人物动作流畅，运镜丝滑。
-0s-0.15s 作为废帧缓冲，不安排关键动作、关键表情和关键对白。
+{chr(10).join(global_lines)}
 
 【场景设计】
 场景：{scene_str}，自然光，室内/室外混合。
