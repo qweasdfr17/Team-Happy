@@ -15,7 +15,7 @@ user-invocable: false
 | `mcp__arcreel__patch_project`（SDK tool） | 新增/修改 project.json 的角色/场景/道具（按 table+name upsert）、顶层 settings 字段或项目概述（overview 分支） | subagent / 主 agent |
 | `mcp__arcreel__get_video_capabilities`（SDK tool） | 查当前项目视频模型能力（model 粒度，所有生成模式通用） | **subagent**（执行任务时自行查询） |
 
-> 分集规划（拆集/重排）由服务端工具 `mcp__arcreel__plan_episodes` / `mcp__arcreel__replan_episodes` 完成，流程见 manga-workflow 阶段 2。
+> 分集规划（拆集/重排/清空）由服务端工具 `mcp__arcreel__plan_episodes` / `mcp__arcreel__replan_episodes` / `mcp__arcreel__reset_episode_plan` 完成，流程见 manga-workflow 阶段 2。清空规划必须走 `reset_episode_plan`，禁止用 `replan_episodes` 替代。
 
 ## 角色/场景/道具写入
 
