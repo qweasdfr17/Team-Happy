@@ -1169,6 +1169,10 @@ export default {
   'skill_name_generate_narration_audio': 'Generate narration audio',
   'skill_name_generate_assets': 'Generate assets',
   'skill_name_compose_video': 'Compose video',
+  'skill_name_premium_video_prompt': 'Premium video prompt',
+  'skill_name_rewrite_script': 'Rewrite script',
+  'skill_name_script_to_shots': 'Script to shots',
+  'skill_name_short_drama_storyboard': 'Short drama storyboard',
   // PendingQuestionWizard
   'pending_question_wizard_label': 'Your input needed',
   'pending_question_wizard_step_question': 'Question {{number}}',

@@ -1170,6 +1170,10 @@ export default {
   'skill_name_generate_narration_audio': '生成旁白配音',
   'skill_name_generate_assets': '生成资产图',
   'skill_name_compose_video': '合成视频',
+  'skill_name_premium_video_prompt': '精品视频提示词',
+  'skill_name_rewrite_script': '调整剧本',
+  'skill_name_script_to_shots': '剧本拆镜',
+  'skill_name_short_drama_storyboard': '短剧分镜脚本',
   // PendingQuestionWizard
   'pending_question_wizard_label': '需要你的选择',
   'pending_question_wizard_step_question': '问题 {{number}}',

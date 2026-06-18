@@ -11,6 +11,15 @@
 - JSON 剧本、分镜、image_prompt、video_prompt 都是派生作品。
 - 如需改写，rewrite-script skill 仅在 suggest_rewrite / rewrite_approved 模式启用。
 
+### Skill 路由速查（用户说什么 → 走哪个 skill）
+
+| 用户说 | → Skill | 说明 |
+|------|------|------|
+| "改剧本 / 压缩剧本 / 调整剧本" | **rewrite-script** | preserve 模式禁止触发 |
+| "改成分镜 / 短剧分镜 / 可出片脚本 / 先大纲再分镜" | **short-drama-storyboard** | 两步走，proposals/ 输出 |
+| 系统内部正式拆 shots | **script-to-shots** | 从 episode script 拆镜头 |
+| "写提示词 / 视频提示词 / 运镜 / 电影感" | **premium-video-prompt** | 精品 9 段式提示词 |
+
 ## ⚠️ 禁止自动生成视频
 
 - 任何视频生成入队前必须用户二次确认（`confirmed=true`）。
