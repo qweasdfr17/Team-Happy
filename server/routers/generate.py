@@ -90,6 +90,8 @@ async def generate_storyboard(
     """
     try:
 
+        _guard_item = {}
+
         def _sync():
             get_project_manager().load_project(project_name)
             script = get_project_manager().load_script(project_name, req.script_file)
@@ -97,8 +99,16 @@ async def generate_storyboard(
             resolved = find_storyboard_item(items, id_field, segment_id)
             if resolved is None:
                 raise HTTPException(status_code=404, detail=_t("segment_not_found", id=segment_id))
+            _guard_item.update(resolved[0])
 
         await asyncio.to_thread(_sync)
+
+        from lib.prompt_source_guard import PromptSourceGuardError, assert_image_prompt_skill_generated
+
+        try:
+            assert_image_prompt_skill_generated(_guard_item, segment_id)
+        except PromptSourceGuardError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         # 结构校验 + 构造经单一守卫点（与 SDK 入队同源，规则不分叉）
         try:
@@ -108,6 +118,9 @@ async def generate_storyboard(
                 resource_id=segment_id,
                 prompt=req.prompt,
                 script_file=req.script_file,
+                extra_payload={
+                    "image_prompt_source": _guard_item.get("image_prompt_source", "pending"),
+                },
             )
         except TaskSpecValidationError as e:
             raise HTTPException(status_code=400, detail=_t(e.code, **e.params))
@@ -161,6 +174,8 @@ async def generate_video(
     """
     try:
 
+        _guard_item = {}
+
         def _sync():
             pm_local = get_project_manager()
             pm_local.load_project(project_name)
@@ -174,6 +189,7 @@ async def generate_video(
                 items, id_field, _, _, _ = get_storyboard_items(script)
                 resolved = find_storyboard_item(items, id_field, segment_id)
                 if resolved:
+                    _guard_item.update(resolved[0])
                     assets = resolved[0].get("generated_assets") or {}
                     if isinstance(assets, dict):
                         storyboard_rel = assets.get("storyboard_image")
@@ -200,6 +216,13 @@ async def generate_video(
 
         await asyncio.to_thread(_sync)
 
+        from lib.prompt_source_guard import PromptSourceGuardError as _PGSE, assert_video_prompt_skill_generated
+
+        try:
+            assert_video_prompt_skill_generated(_guard_item, segment_id)
+        except _PGSE as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
         # 结构校验 + 构造经单一守卫点（与 SDK 入队同源，规则不分叉）。
         # duration 是能力维度，留待执行层在 provider 解析后校验（见 ADR-0001）。
         try:
@@ -209,7 +232,11 @@ async def generate_video(
                 resource_id=segment_id,
                 prompt=req.prompt,
                 script_file=req.script_file,
-                extra_payload={"duration_seconds": req.duration_seconds, "seed": req.seed},
+                extra_payload={
+                    "duration_seconds": req.duration_seconds,
+                    "seed": req.seed,
+                    "video_prompt_source": _guard_item.get("video_prompt_source", "pending"),
+                },
             )
         except TaskSpecValidationError as e:
             raise HTTPException(status_code=400, detail=_t(e.code, **e.params))

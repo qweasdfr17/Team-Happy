@@ -65,6 +65,11 @@ def _build_prompt(
     style_description: str,
     id_field: str,
 ) -> str:
+    from lib.prompt_source_guard import assert_image_prompt_skill_generated
+
+    item_id = str(segment.get(id_field) or "?")
+    assert_image_prompt_skill_generated(segment, item_id)
+
     image_prompt = segment.get("image_prompt", "")
     if not image_prompt:
         raise ValueError(f"片段/场景 {segment[id_field]} 缺少 image_prompt 字段")
@@ -115,6 +120,9 @@ def _build_specs(
                 resource_id=plan.resource_id,
                 prompt=prompt,
                 script_file=script_filename,
+                extra_payload={
+                    "image_prompt_source": item.get("image_prompt_source", "pending"),
+                },
                 dependency_resource_id=plan.dependency_resource_id,
                 dependency_group=plan.dependency_group,
                 dependency_index=plan.dependency_index,

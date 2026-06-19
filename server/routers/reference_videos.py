@@ -463,6 +463,13 @@ async def generate_unit(
         unit = _find_unit(script, unit_id, _t)  # raises 404 if missing
         guard_prompt = assemble_shots_text(unit.get("shots") or [])
 
+    from lib.prompt_source_guard import PromptSourceGuardError, assert_video_prompt_skill_generated
+
+    try:
+        assert_video_prompt_skill_generated(unit, unit_id)
+    except PromptSourceGuardError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     # 经统一守卫点构造：空提示词的结构校验在此当场拒绝（400），与 SDK 入队路径一致，
     # 不再漏到执行层失败（见 ADR-0001）。
     try:
@@ -472,6 +479,9 @@ async def generate_unit(
             resource_id=unit_id,
             prompt=guard_prompt,
             script_file=script_file,
+            extra_payload={
+                "video_prompt_source": unit.get("video_prompt_source", "pending"),
+            },
         )
     except TaskSpecValidationError as exc:
         raise HTTPException(status_code=400, detail=_t(exc.code, **exc.params)) from exc

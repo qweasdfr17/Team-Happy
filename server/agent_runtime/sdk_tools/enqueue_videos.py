@@ -37,9 +37,13 @@ from server.services.reference_video_tasks import resolve_max_unit_duration
 
 
 def _get_video_prompt(item: dict[str, Any]) -> str:
+    from lib.prompt_source_guard import assert_video_prompt_skill_generated
+
+    item_id = item.get("segment_id") or item.get("scene_id") or item.get("shot_id") or "?"
+    assert_video_prompt_skill_generated(item, str(item_id))
+
     prompt = item.get("video_prompt")
     if not prompt:
-        item_id = item.get("segment_id") or item.get("scene_id")
         raise ValueError(f"片段/场景缺少 video_prompt 字段: {item_id}")
     if is_structured_video_prompt(prompt):
         return video_prompt_to_yaml(prompt)
@@ -144,7 +148,9 @@ def _build_video_specs(
         # duration 是能力维度，留待执行层在 provider 解析后校验（见 ADR-0001）；
         # 原样透传调用方显式指定的值，不在入队侧做 int() 截断式归一化（否则会把
         # 本应被执行层拒绝的非法值静默修正）。缺省由执行层按 caps 收口默认。
-        extra_payload: dict[str, Any] = {}
+        extra_payload: dict[str, Any] = {
+            "video_prompt_source": item.get("video_prompt_source", "pending"),
+        }
         duration = item.get("duration_seconds")
         if duration is not None:
             extra_payload["duration_seconds"] = duration
@@ -187,12 +193,18 @@ def _build_reference_specs(
         # 都跳过并告警，与「没有 shots」一致，不让一个坏 unit 中断整批。
         # 注意 TaskSpecValidationError 是 ValueError 子类，捕 ValueError 同时覆盖两者。
         try:
+            from lib.prompt_source_guard import assert_video_prompt_skill_generated
+
+            assert_video_prompt_skill_generated(unit, unit_id)
             spec = TaskSpec.from_request(
                 task_type="reference_video",
                 media_type="video",
                 resource_id=unit_id,
                 prompt=assemble_shots_text(unit["shots"]),
                 script_file=script_filename,
+                extra_payload={
+                    "video_prompt_source": unit.get("video_prompt_source", "pending"),
+                },
             )
         except ValueError as exc:
             log.append(f"⚠️  {unit_id} 入队校验未通过，跳过：{exc}")
@@ -304,6 +316,9 @@ def _build_ad_reference_specs(
             continue
         try:
             shots = resolve_ad_unit_shots(script, unit)
+            from lib.prompt_source_guard import assert_video_prompt_skill_generated
+
+            assert_video_prompt_skill_generated(unit, unit_id)
             prompt = ad_unit_prompt_override(unit) or render_ad_unit_prompt(shots, style=style)
             spec = TaskSpec.from_request(
                 task_type="reference_video",
@@ -311,6 +326,9 @@ def _build_ad_reference_specs(
                 resource_id=unit_id,
                 prompt=prompt,
                 script_file=script_filename,
+                extra_payload={
+                    "video_prompt_source": unit.get("video_prompt_source", "pending"),
+                },
             )
         except ValueError as exc:
             log.append(f"⚠️  {unit_id} 入队校验未通过，跳过：{exc}")
@@ -630,7 +648,9 @@ def generate_video_scene_tool(ctx: ToolContext):
             # duration 是能力维度，留待执行层在 provider 解析后校验（见 ADR-0001）；
             # 原样透传调用方显式指定的值，不在入队侧做 int() 截断式归一化（否则会把
             # 本应被执行层拒绝的非法值静默修正）。缺省由执行层按 caps 收口默认。
-            extra_payload: dict[str, Any] = {}
+            extra_payload: dict[str, Any] = {
+                "video_prompt_source": item.get("video_prompt_source", "pending"),
+            }
             duration = item.get("duration_seconds")
             if duration is not None:
                 extra_payload["duration_seconds"] = duration

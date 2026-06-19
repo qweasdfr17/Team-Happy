@@ -938,8 +938,10 @@ class EpisodePlanner:
             writes.append((episode_path, text[seg_start:seg_end]))
         # 校验全部通过后统一落盘：校验类失败不会留下按新布局部分重写的派生文件
         source_dir.mkdir(exist_ok=True)
+        from lib.source_cleaner import strip_video_prompts
+
         for episode_path, content in writes:
-            episode_path.write_text(content, encoding="utf-8")
+            episode_path.write_text(strip_video_prompts(content), encoding="utf-8")
         for num, path in discover_episode_files(self.project_path).items():
             if num not in keep:
                 try:

@@ -667,7 +667,49 @@ class ScriptGenerator:
         script_data.pop("characters_in_episode", None)
         script_data.pop("clues_in_episode", None)
 
+        # 兜底：强制 image_prompt / video_prompt / shots[].text 为占位值
+        # 主防线是 SkipJsonSchema（LLM 不生成），此处处理旁路写入 / 旧数据兼容
+        self._ensure_prompts_placeholder(script_data, gen_mode)
+
         return script_data
+
+    @staticmethod
+    def _ensure_prompts_placeholder(script_data: dict, gen_mode: str) -> None:
+        """兜底：确保所有 image_prompt / video_prompt / shots[].text 为占位值。
+
+        同时设 source marker 为 "pending"（若缺失或非 "skill"）。
+        """
+        PLACEHOLDER_IMG = {
+            "scene": "",
+            "composition": {"shot_type": "Long Shot", "lighting": "", "ambiance": ""},
+        }
+        PLACEHOLDER_VID = {
+            "action": "", "camera_motion": "Static", "ambiance_audio": "", "dialogue": [],
+        }
+
+        if gen_mode == "reference_video":
+            for unit in (script_data.get("video_units") or []):
+                if not isinstance(unit, dict):
+                    continue
+                if unit.get("video_prompt_source") not in ("skill",):
+                    unit["video_prompt_source"] = "pending"
+                for shot in (unit.get("shots") or []):
+                    if isinstance(shot, dict):
+                        shot["text"] = ""
+            return
+
+        shape = script_shape(script_data.get("content_mode", "narration"))
+        for item in (script_data.get(shape.items_key) or []):
+            if not isinstance(item, dict):
+                continue
+            if item.get("image_prompt") != PLACEHOLDER_IMG:
+                item["image_prompt"] = dict(PLACEHOLDER_IMG)
+            if item.get("image_prompt_source") not in ("skill",):
+                item["image_prompt_source"] = "pending"
+            if item.get("video_prompt") != PLACEHOLDER_VID:
+                item["video_prompt"] = dict(PLACEHOLDER_VID)
+            if item.get("video_prompt_source") not in ("skill",):
+                item["video_prompt_source"] = "pending"
 
     def _quality_probe(self, script_data: dict, episode: int) -> None:
         """落盘后的轻量质量探针：仅日志，不阻断、不重试。

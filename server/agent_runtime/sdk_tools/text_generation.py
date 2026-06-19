@@ -226,6 +226,10 @@ def normalize_drama_script_tool(ctx: ToolContext):
             if not novel_text.strip():
                 return {"content": [{"type": "text", "text": "❌ 小说原文为空"}], "is_error": True}
 
+            from lib.source_cleaner import strip_video_prompts
+
+            novel_text = strip_video_prompts(novel_text)
+
             default_duration, supported_durations = await _fetch_caps_with_fallback(project)
             prompt = build_normalize_prompt(
                 novel_text=novel_text,

@@ -149,8 +149,22 @@ class NarrationSegment(BaseModel):
     characters_in_segment: list[str] = Field(description="出场角色名称列表")
     scenes: list[str] = Field(default_factory=list, description="出场场景名称列表")
     props: list[str] = Field(default_factory=list, description="出场道具名称列表")
-    image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
-    video_prompt: VideoPrompt = Field(description="视频生成提示词")
+    # image_prompt / video_prompt 对 LLM 隐藏（SkipJsonSchema），由代码填入占位值。
+    # LLM 不生成这两个字段，避免 token 消耗和源文件 prompt 污染。
+    image_prompt: SkipJsonSchema[ImagePrompt] = Field(
+        default_factory=lambda: ImagePrompt(
+            scene="",
+            composition=Composition(shot_type="Long Shot", lighting="", ambiance=""),
+        )
+    )
+    video_prompt: SkipJsonSchema[VideoPrompt] = Field(
+        default_factory=lambda: VideoPrompt(
+            action="", camera_motion="Static", ambiance_audio="", dialogue=[],
+        )
+    )
+    # prompt 来源标记：pending=等待新 skill 生成, skill=新 skill 已生成（允许生成图片/视频）
+    image_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
+    video_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
     # transition_to_next 由 _add_metadata default + 用户 PATCH 路径(projects.py UpdateSegmentRequest)管理;
     # LLM 无 prompt 引导,隐藏避免乱填污染剪映/compose-video 合成
     transition_to_next: SkipJsonSchema[TransitionType] = Field(default="cut", description="转场类型")
@@ -232,8 +246,22 @@ class DramaScene(BaseModel):
     characters_in_scene: list[str] = Field(description="出场角色名称列表")
     scenes: list[str] = Field(default_factory=list, description="出场场景名称列表")
     props: list[str] = Field(default_factory=list, description="出场道具名称列表")
-    image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
-    video_prompt: VideoPrompt = Field(description="视频生成提示词")
+    # image_prompt / video_prompt 对 LLM 隐藏（SkipJsonSchema），由代码填入占位值。
+    # LLM 不生成这两个字段，避免 token 消耗和源文件 prompt 污染。
+    image_prompt: SkipJsonSchema[ImagePrompt] = Field(
+        default_factory=lambda: ImagePrompt(
+            scene="",
+            composition=Composition(shot_type="Long Shot", lighting="", ambiance=""),
+        )
+    )
+    video_prompt: SkipJsonSchema[VideoPrompt] = Field(
+        default_factory=lambda: VideoPrompt(
+            action="", camera_motion="Static", ambiance_audio="", dialogue=[],
+        )
+    )
+    # prompt 来源标记：pending=等待新 skill 生成, skill=新 skill 已生成（允许生成图片/视频）
+    image_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
+    video_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
     # 画外音/旁白原文（逐字保真锚，日后接 TTS）。取 list[str] 而非 str：一个场景可含多段
     # 有序画外音插入（基数为多）。仅 source_kind=screenplay 提取时填入；novel-drama 恒空数组。
     # 与 video_prompt.dialogue（角色台词）分工：dialogue 有 speaker，voiceover 无。
@@ -291,8 +319,22 @@ class AdShot(BaseModel):
     scenes: list[str] = Field(default_factory=list, description="出场场景名称列表")
     props: list[str] = Field(default_factory=list, description="出场道具名称列表")
     products_in_shot: list[str] = Field(default_factory=list, description="出场产品名称列表，非空即产品镜头")
-    image_prompt: ImagePrompt = Field(description="分镜图生成提示词")
-    video_prompt: VideoPrompt = Field(description="视频生成提示词")
+    # image_prompt / video_prompt 对 LLM 隐藏（SkipJsonSchema），由代码填入占位值。
+    # LLM 不生成这两个字段，避免 token 消耗和源文件 prompt 污染。
+    image_prompt: SkipJsonSchema[ImagePrompt] = Field(
+        default_factory=lambda: ImagePrompt(
+            scene="",
+            composition=Composition(shot_type="Long Shot", lighting="", ambiance=""),
+        )
+    )
+    video_prompt: SkipJsonSchema[VideoPrompt] = Field(
+        default_factory=lambda: VideoPrompt(
+            action="", camera_motion="Static", ambiance_audio="", dialogue=[],
+        )
+    )
+    # prompt 来源标记：pending=等待新 skill 生成, skill=新 skill 已生成（允许生成图片/视频）
+    image_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
+    video_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
     # 见 NarrationSegment.transition_to_next 说明
     transition_to_next: SkipJsonSchema[TransitionType] = Field(default="cut", description="转场类型")
     # 见 NarrationSegment 同名字段说明。
@@ -407,7 +449,7 @@ class Shot(BaseModel):
         le=REFERENCE_SHOT_DURATION_RANGE[1],
         description="该镜头时长（秒）",
     )
-    text: str = Field(description="镜头描述，可包含 @[角色]/@[场景]/@[道具] 引用")
+    text: SkipJsonSchema[str] = Field(default="", description="镜头描述，对 LLM 隐藏")
 
 
 class ReferenceResource(BaseModel):
@@ -425,12 +467,14 @@ class ReferenceVideoUnit(BaseModel):
     model_config = _STRICT_CONFIG
 
     unit_id: str = Field(description="格式 E{集}U{序号}")
-    shots: list[Shot] = Field(min_length=1, max_length=3, description="1-3 个 shot")
+    shots: list[Shot] = Field(min_length=1, max_length=4, description="1-4 个 shot")
     references: list[ReferenceResource] = Field(
         default_factory=list,
         description="按顺序决定 [图N] 编号",
     )
     duration_seconds: int = Field(description="派生字段：所有 shot 时长之和")
+    # prompt 来源标记：pending=等待新 skill 生成, skill=新 skill 已生成（允许生成视频）
+    video_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
     # duration_override / transition_to_next / note / generated_assets 均为 UI / runtime / 人工字段，对 LLM 隐藏。
     duration_override: SkipJsonSchema[bool] = Field(default=False, description="true 时停止自动派生")
     transition_to_next: SkipJsonSchema[TransitionType] = Field(default="cut", description="转场类型")

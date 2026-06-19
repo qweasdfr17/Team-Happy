@@ -941,6 +941,10 @@ async def execute_storyboard_task(
     if not script_file:
         raise ValueError("script_file is required for storyboard task")
 
+    from lib.prompt_source_guard import assert_image_prompt_skill_generated_from_payload
+
+    assert_image_prompt_skill_generated_from_payload(payload, resource_id)
+
     prompt = payload.get("prompt")
     if prompt is None:
         raise ValueError("prompt is required for storyboard task")
@@ -1111,6 +1115,10 @@ async def execute_video_task(
     script_file = payload.get("script_file")
     if not script_file:
         raise ValueError("script_file is required for video task")
+
+    from lib.prompt_source_guard import assert_video_prompt_skill_generated_from_payload
+
+    assert_video_prompt_skill_generated_from_payload(payload, resource_id)
 
     prompt = payload.get("prompt")
     if prompt is None:

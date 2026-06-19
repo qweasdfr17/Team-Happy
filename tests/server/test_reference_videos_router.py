@@ -197,6 +197,15 @@ def test_reorder_units_rejects_duplicates(client: TestClient):
 def test_generate_unit_enqueues_task(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     uid = _seed_unit(client)
 
+    # 设 video_prompt_source="skill" 以通过 guard
+    from server.routers.reference_videos import get_project_manager as _gpm
+
+    _pm = _gpm()
+    with _pm.locked_script("demo", "episode_1.json") as script:
+        for u in script.get("video_units") or []:
+            if u.get("unit_id") == uid:
+                u["video_prompt_source"] = "skill"
+
     enqueued: list[dict] = []
 
     class _FakeQueue:
@@ -219,12 +228,20 @@ def test_generate_unit_enqueues_task(client: TestClient, monkeypatch: pytest.Mon
     assert enqueued[0]["payload"]["prompt"] == "@张三 推门"
 
 
+def test_generate_unit_rejects_non_skill_prompt(client: TestClient):
+    """没有 video_prompt_source=\"skill\" 的 unit 必须在生成前被拒绝。"""
+    uid = _seed_unit(client)
+    resp = client.post(f"/api/v1/projects/demo/reference-videos/episodes/1/units/{uid}/generate")
+    assert resp.status_code == 400, resp.text
+
+
 def test_generate_unit_rejects_blank_prompt(client: TestClient, tmp_path: Path):
     """shots 文本全空白的 unit 在入队时被守卫点拒绝（400），不再漏到执行层失败。"""
     script_path = tmp_path / "projects" / "demo" / "scripts" / "episode_1.json"
     script = json.loads(script_path.read_text(encoding="utf-8"))
     script["video_units"] = [
-        {"unit_id": "E1U1", "shots": [{"duration": 3, "text": "  "}], "references": [], "duration_seconds": 3}
+        {"unit_id": "E1U1", "shots": [{"duration": 3, "text": "  "}], "references": [],
+         "duration_seconds": 3, "video_prompt_source": "skill"}
     ]
     script_path.write_text(json.dumps(script, ensure_ascii=False), encoding="utf-8")
 
