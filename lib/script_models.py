@@ -425,7 +425,7 @@ class ReferenceVideoUnit(BaseModel):
     model_config = _STRICT_CONFIG
 
     unit_id: str = Field(description="格式 E{集}U{序号}")
-    shots: list[Shot] = Field(min_length=1, max_length=4, description="1-4 个 shot")
+    shots: list[Shot] = Field(min_length=1, max_length=3, description="1-3 个 shot")
     references: list[ReferenceResource] = Field(
         default_factory=list,
         description="按顺序决定 [图N] 编号",

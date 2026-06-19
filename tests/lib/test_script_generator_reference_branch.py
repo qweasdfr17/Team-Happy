@@ -371,7 +371,7 @@ async def test_effective_generation_mode_honors_episode_override(tmp_path: Path)
 
 @pytest.mark.asyncio
 async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
-    """reference_video + narration 生成后，video_units 应被后处理为精品提示词格式。
+    """reference_video + narration 生成后，video_units 应被后处理为 ai-video-prompt 风格精品提示词。
 
     回归覆盖：红框 (ReferenceVideoCard) 的数据源是 video_units[].shots[0].text
     + duration_override=true，生成后必须立即符合此契约，不能等到 agent 手动写回。
@@ -386,10 +386,11 @@ async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
                 "title": "t",
                 "content_mode": "narration",
                 "generation_mode": "reference_video",
-                "_supported_durations": [4, 8],
+                "_supported_durations": [4, 8, 15, 17, 25],
                 "overview": {"synopsis": "s", "genre": "g", "theme": "t", "world_setting": "w"},
                 "style": "国漫",
                 "style_description": "水墨",
+                "aspect_ratio": "16:9",
                 "characters": {"主角": {"description": "d"}},
                 "scenes": {"酒馆": {"description": "古朴酒馆"}},
                 "props": {},
@@ -410,9 +411,9 @@ async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
                 '{"episode":1,"title":"t",'
                 '"summary":"s","novel":{"title":"t","chapter":"1"},'
                 '"video_units":[{"unit_id":"E1U1",'
-                '"shots":[{"duration":3,"text":"主角推门"},{"duration":2,"text":"环顾四周"}],'
+                '"shots":[{"duration":8,"text":"@主角 推门"},{"duration":9,"text":"环顾酒馆四周"}],'
                 '"references":[{"type":"character","name":"主角"},{"type":"scene","name":"酒馆"}],'
-                '"duration_seconds":5,"duration_override":false,"transition_to_next":"cut"}]}'
+                '"duration_seconds":17,"duration_override":false,"transition_to_next":"cut"}]}'
             )
         )
     )
@@ -426,22 +427,36 @@ async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
     # 红框契约：duration_override 必须为 true
     assert unit["duration_override"] is True, "精品提示词必须设置 duration_override=true"
 
-    # 红框契约：单 shot，duration = 原总时长
-    assert len(unit["shots"]) == 1, "精品提示词必须是单 shot"
-    assert unit["shots"][0]["duration"] == 5, "shot duration 必须等于原总时长"
-    assert unit["duration_seconds"] == 5, "duration_seconds 保持原总时长"
+    # 红框契约：多 shot 保留，shots[0] 带完整精品提示词
+    assert len(unit["shots"]) == 2, "精品提示词保留多 shot 结构"
+    assert unit["shots"][0]["duration"] == 8, "shots[0].duration = 第一个 shot 时长 8s"
+    assert unit["shots"][1]["duration"] == 9, "shots[1].duration = 第二个 shot 时长 9s"
+    assert unit["duration_seconds"] == 17, "duration_seconds = 8+9 = 17"
 
-    # 红框契约：shot text 是精品提示词格式，不是原版简单 shot 文本
+    # 红框契约：shot text 是 ai-video-prompt 风格精品提示词
     prompt = unit["shots"][0]["text"]
     assert "【图片引用声明】" in prompt
-    assert "图片1：主角" in prompt
-    assert "图片2：酒馆" in prompt
-    assert "【切片段" in prompt
+    assert "@主角" in prompt
+    assert "@酒馆" in prompt
+    assert "【分镜1 | 时长 8s】" in prompt
+    assert "【分镜2 | 时长 9s】" in prompt
+    assert "【基础设定】" in prompt
+    assert "【画风】" in prompt
+    assert "【场景光影基调】" in prompt
     assert "【负面约束】" in prompt
+    assert "不要背景音乐，不要字幕" in prompt
+    # 正文不含 @
+    after_header = prompt.split("【全局视频要求】", 1)[1]
+    assert "@" not in after_header
 
-    # 不得出现 Shot header 拼接格式（原版简单提示词）
+    # 不得出现旧格式
+    assert "【切片段" not in prompt
+    assert "【场景设计】" not in prompt
+    assert "【目标情绪】" not in prompt
     assert "Shot 1" not in prompt
-    assert "Shot 2" not in prompt
+
+    # 后续 shot text 为空，不污染后端 prompt 拼接 / 红框不重复
+    assert unit["shots"][1]["text"] == "", "后续 shot text 应为空串"
 
     # references 已同步写入
     ref_names = {(r["type"], r["name"]) for r in unit.get("references", [])}
@@ -451,3 +466,66 @@ async def test_generate_applies_premium_prompt_to_video_units(tmp_path: Path):
     # generated_assets / transition_to_next 不丢
     assert "generated_assets" in unit
     assert unit["transition_to_next"] == "cut"
+
+
+@pytest.mark.asyncio
+async def test_generate_does_not_trigger_video_generation(tmp_path: Path):
+    """ScriptGenerator.generate() 不触发任何视频生成任务 / 不入队。"""
+    import json as _j
+
+    project_dir = tmp_path / "proj"
+    project_dir.mkdir()
+    (project_dir / "project.json").write_text(
+        _j.dumps(
+            {
+                "title": "t",
+                "content_mode": "narration",
+                "generation_mode": "reference_video",
+                "_supported_durations": [8, 15, 25],
+                "overview": {"synopsis": "s", "genre": "g", "theme": "t", "world_setting": "w"},
+                "style": "国漫",
+                "style_description": "水墨",
+                "aspect_ratio": "16:9",
+                "characters": {"主角": {"description": "d"}},
+                "scenes": {"酒馆": {"description": "古朴酒馆"}},
+                "props": {},
+                "episodes": [{"episode": 1, "generation_mode": "reference_video"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    drafts = project_dir / "drafts" / "episode_1"
+    drafts.mkdir(parents=True)
+    (drafts / "step1_reference_units.md").write_text("E1U1 stub", encoding="utf-8")
+
+    fake_generator = MagicMock()
+    fake_generator.model = "mock"
+    fake_generator.generate = AsyncMock(
+        return_value=MagicMock(
+            text=(
+                '{"episode":1,"title":"t",'
+                '"summary":"s","novel":{"title":"t","chapter":"1"},'
+                '"video_units":[{"unit_id":"E1U1",'
+                '"shots":[{"duration":8,"text":"@主角 推门"},{"duration":9,"text":"环顾四周"}],'
+                '"references":[{"type":"character","name":"主角"},{"type":"scene","name":"酒馆"}],'
+                '"duration_seconds":17,"duration_override":false,"transition_to_next":"cut"}]}'
+            )
+        )
+    )
+
+    gen = ScriptGenerator(project_dir, generator=fake_generator)
+    out = await gen.generate(episode=1)
+
+    # 确认输出是正常的剧本文件
+    assert out.exists()
+    data = _j.loads(out.read_text(encoding="utf-8"))
+    assert data["generation_mode"] == "reference_video"
+
+    # 验证 video_units 是提示词不是视频文件路径
+    unit = data["video_units"][0]
+    assert "generated_assets" in unit
+    # generated_assets 不应包含已完成的视频状态
+    assert unit["generated_assets"].get("status") != "completed"
+    # 不应有视频文件路径
+    assert "video_file" not in unit
+    assert "video_path" not in unit
