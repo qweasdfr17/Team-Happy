@@ -1422,6 +1422,46 @@ async def test_patch_reference_video_unit_prompt_infers_narration_references(
     assert "精品提示词正文内容" in unit["shots"][0]["text"]
 
 
+async def test_patch_reference_video_unit_prompt_cleans_chinese_spacing(
+    fake_ctx: ToolContext,
+) -> None:
+    from contextlib import contextmanager
+
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = fake_ctx.pm
+    pm.script_payload["video_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shots": [{"text": "old shot", "duration": 5}],
+            "duration_seconds": 5,
+            "references": [],
+        }
+    ]
+
+    @contextmanager
+    def _locked(_name: str, _filename: str, **_kw: Any):
+        yield pm.script_payload  # type: ignore[attr-defined]
+
+    pm.locked_script = _locked  # type: ignore[attr-defined]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(fake_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            "prompt": "画面：中学走廊 白天，少年欧阳韬 怀抱 习题册 缓步穿行。\nShot 1 保留，Sundance 2.0 保留。",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    text = pm.script_payload["video_units"][0]["shots"][0]["text"]  # type: ignore[attr-defined]
+    assert "中学走廊白天，少年欧阳韬怀抱习题册缓步穿行。" in text
+    assert "Shot 1" in text
+    assert "Sundance 2.0" in text
+
+
 async def test_patch_reference_video_unit_prompt_no_match_keeps_original_refs(
     fake_ctx: ToolContext,
 ) -> None:
@@ -1462,6 +1502,36 @@ async def test_patch_reference_video_unit_prompt_no_match_keeps_original_refs(
     unit = pm.script_payload["video_units"][0]  # type: ignore[attr-defined]
     # 推断无结果时保留原有 references
     assert unit["references"] == original_refs
+
+
+async def test_patch_reference_video_unit_prompt_cleans_ad_prompt_override(
+    ad_reference_ctx: ToolContext,
+) -> None:
+    from server.agent_runtime.sdk_tools.patch_reference_video_unit import patch_reference_video_unit_prompt_tool
+
+    pm = ad_reference_ctx.pm
+    pm.script_payload["reference_units"] = [  # type: ignore[attr-defined]
+        {
+            "unit_id": "E1U1",
+            "shot_ids": ["E1S1", "E1S2"],
+            "references": [],
+            "generated_assets": {"status": "pending"},
+        }
+    ]
+
+    tool_obj = patch_reference_video_unit_prompt_tool(ad_reference_ctx)
+    out = await _call(
+        tool_obj,
+        {
+            "episode": 1,
+            "unit_id": "E1U1",
+            "prompt": "产品 展示，手部 拿起 保温杯，AI video prompt 保留。",
+        },
+    )
+
+    assert out.get("is_error") is not True, out
+    unit = pm.script_payload["reference_units"][0]  # type: ignore[attr-defined]
+    assert unit["prompt_override"] == "产品展示，手部拿起保温杯，AI video prompt 保留。"
 
 
 async def test_generate_video_episode_ad_reference_uses_prompt_override(

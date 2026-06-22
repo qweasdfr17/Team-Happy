@@ -1,9 +1,7 @@
 """Context Pack 构建器（lib/context_pack/builder.py）单元测试。"""
 
-import pytest
 
 from lib.context_pack.builder import build_context_pack
-
 
 # ── helpers ───────────────────────────────────────────────────────────────
 

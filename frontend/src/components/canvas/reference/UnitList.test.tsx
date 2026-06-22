@@ -28,7 +28,7 @@ function mkUnit(id: string, overrides: Partial<ReferenceVideoUnit> = {}): Refere
 describe("UnitList", () => {
   it("renders empty state when no units", () => {
     render(<UnitList units={[]} selectedId={null} onSelect={vi.fn()} onAdd={vi.fn()} />);
-    expect(screen.getByText(/No units yet|尚未创建任何 Unit/)).toBeInTheDocument();
+    expect(screen.getByText(/No units yet|尚未创建任何视频单元/)).toBeInTheDocument();
   });
 
   it("renders a row per unit with id, duration and prompt preview", () => {
@@ -72,7 +72,7 @@ describe("UnitList", () => {
   it("calls onAdd when the 'new unit' button is clicked", () => {
     const onAdd = vi.fn();
     render(<UnitList units={[]} selectedId={null} onSelect={vi.fn()} onAdd={onAdd} />);
-    fireEvent.click(screen.getByRole("button", { name: /New Unit|新建 Unit/ }));
+    fireEvent.click(screen.getByRole("button", { name: /New Unit|新建视频单元/ }));
     expect(onAdd).toHaveBeenCalled();
   });
 

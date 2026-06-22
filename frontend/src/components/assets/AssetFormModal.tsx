@@ -304,7 +304,9 @@ export function AssetFormModal({
                     onChange={(e) => setAudio(e.target.files?.[0] ?? null)}
                   />
                   {previewAudioUrl && !audio ? (
-                    <audio className="mt-2 h-8 w-full" src={previewAudioUrl} controls preload="metadata" />
+                    <audio className="mt-2 h-8 w-full" src={previewAudioUrl} controls preload="metadata">
+                      <track kind="captions" />
+                    </audio>
                   ) : null}
                 </FieldLabel>
               </>

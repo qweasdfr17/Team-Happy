@@ -20,6 +20,7 @@ import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ProviderModelSelect } from "@/components/ui/ProviderModelSelect";
 import { useEndpointCatalogStore } from "@/stores/endpoint-catalog-store";
+import { formatBackendDisplay } from "@/utils/model-display";
 import type { CustomProviderInfo, ImageCap } from "@/types/custom-provider";
 
 export interface ImageModelDualSelectProps {
@@ -140,10 +141,10 @@ export function ImageModelDualSelect({
 
   const fallbackLabel = defaultLabel ?? t("use_global_default");
   const t2iHint = globalDefaultT2I
-    ? t("current_global_default", { value: globalDefaultT2I })
+    ? t("current_global_default", { value: formatBackendDisplay(globalDefaultT2I, providerNames) })
     : defaultHint;
   const i2iHint = globalDefaultI2I
-    ? t("current_global_default", { value: globalDefaultI2I })
+    ? t("current_global_default", { value: formatBackendDisplay(globalDefaultI2I, providerNames) })
     : defaultHint;
   const dualHint = showCapabilityHint ? (
     <p className="text-[11.5px] leading-[1.5] text-text-4">{t("model_image_dual_hint")}</p>

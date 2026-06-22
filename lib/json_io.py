@@ -5,14 +5,23 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
+
+_WINDOWS_RETRY_DELAYS = (0.005, 0.01, 0.02, 0.04, 0.08, 0.16)
 
 
 def load_json(path: Path) -> Any:
     """严格加载 JSON。异常直接抛出，调用方按业务需要做 try/except。"""
-    with open(path, encoding="utf-8") as handle:
-        return json.load(handle)
+    for delay in (*_WINDOWS_RETRY_DELAYS, None):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                return json.load(handle)
+        except PermissionError:
+            if delay is None:
+                raise
+            time.sleep(delay)
 
 
 def load_json_or_none(path: Path) -> Any | None:
@@ -37,7 +46,14 @@ def atomic_write_json(path: Path, data: Any) -> None:
         ) as tmp:
             tmp_path = Path(tmp.name)
             json.dump(data, tmp, ensure_ascii=False, indent=2)
-        os.replace(tmp_path, path)
+        for delay in (*_WINDOWS_RETRY_DELAYS, None):
+            try:
+                os.replace(tmp_path, path)
+                break
+            except PermissionError:
+                if delay is None:
+                    raise
+                time.sleep(delay)
         tmp_path = None
     finally:
         if tmp_path is not None:

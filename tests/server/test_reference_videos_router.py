@@ -86,6 +86,17 @@ def test_add_unit_creates_minimal_entry(client: TestClient):
     assert payload["unit"]["unit_id"].startswith("E1U")
     assert payload["unit"]["duration_seconds"] == 3
     assert payload["unit"]["references"] == [{"type": "character", "name": "张三"}]
+    assert payload["unit"]["shots"][0]["text"] == "@张三 推门"
+
+
+def test_add_unit_cleans_chinese_prompt_spacing(client: TestClient):
+    resp = client.post(
+        "/api/v1/projects/demo/reference-videos/episodes/1/units",
+        json={"prompt": "Shot 1 (3s): 中学走廊 白天，少年欧阳韬 怀抱 习题册 缓步穿行。", "references": []},
+    )
+    assert resp.status_code == 201, resp.text
+    text = resp.json()["unit"]["shots"][0]["text"]
+    assert text == "中学走廊白天，少年欧阳韬怀抱习题册缓步穿行。"
 
 
 def test_add_unit_rejects_unknown_asset_reference(client: TestClient):
@@ -117,6 +128,7 @@ def test_patch_unit_prompt_recomputes_duration(client: TestClient):
     assert unit["duration_seconds"] == 10
     # 注意：prompt 新增的 @酒馆 应由 caller 先 PATCH references 再 PATCH prompt；本端点仅按旧 references 映射
     assert len(unit["references"]) == 1
+    assert unit["shots"][0]["text"] == "@张三 推门"
 
 
 def test_patch_unit_references_only(client: TestClient):
@@ -231,6 +243,14 @@ def test_generate_unit_enqueues_task(client: TestClient, monkeypatch: pytest.Mon
 def test_generate_unit_rejects_non_skill_prompt(client: TestClient):
     """没有 video_prompt_source=\"skill\" 的 unit 必须在生成前被拒绝。"""
     uid = _seed_unit(client)
+    from server.routers.reference_videos import get_project_manager as _gpm
+
+    _pm = _gpm()
+    with _pm.locked_script("demo", "episode_1.json") as script:
+        for u in script.get("video_units") or []:
+            if u.get("unit_id") == uid:
+                u["video_prompt_source"] = "pending"
+
     resp = client.post(f"/api/v1/projects/demo/reference-videos/episodes/1/units/{uid}/generate")
     assert resp.status_code == 400, resp.text
 
@@ -326,6 +346,34 @@ def test_patch_unit_duration_override_without_header(client: TestClient):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["unit"]["duration_seconds"] == 7
+
+
+def test_add_unit_duration_over_15_is_split(client: TestClient):
+    resp = client.post(
+        "/api/v1/projects/demo/reference-videos/episodes/1/units",
+        json={"prompt": "@张三 推门后与众人对峙", "references": [{"type": "character", "name": "张三"}], "duration_seconds": 17},
+    )
+    assert resp.status_code == 201, resp.text
+
+    units = client.get("/api/v1/projects/demo/reference-videos/episodes/1/units").json()["units"]
+    assert [u["unit_id"] for u in units] == ["E1U1", "E1U2"]
+    assert [u["duration_seconds"] for u in units] == [9, 8]
+    assert all(u["duration_seconds"] <= 15 for u in units)
+    assert all("自动拆分" in u["shots"][0]["text"] for u in units)
+
+
+def test_patch_unit_duration_over_15_is_split(client: TestClient):
+    uid = _seed_unit(client)
+
+    resp = client.patch(
+        f"/api/v1/projects/demo/reference-videos/episodes/1/units/{uid}",
+        json={"prompt": "@张三 推门后与众人对峙", "duration_seconds": 17},
+    )
+    assert resp.status_code == 200, resp.text
+
+    units = client.get("/api/v1/projects/demo/reference-videos/episodes/1/units").json()["units"]
+    assert [u["duration_seconds"] for u in units] == [9, 8]
+    assert all(u["duration_seconds"] <= 15 for u in units)
 
 
 def test_reorder_units_rejects_true_duplicate(client: TestClient):

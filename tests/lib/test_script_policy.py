@@ -1,6 +1,5 @@
 """script_policy 模块测试。"""
 
-import pytest
 
 from lib.script_policy import (
     DEFAULT_SCRIPT_POLICY,

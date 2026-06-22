@@ -25,6 +25,7 @@ from lib.prompt_builders_script import (
     build_drama_prompt,
     build_narration_prompt,
 )
+from lib.reference_video.duration_guard import normalize_reference_video_script
 from lib.script_models import (
     AD_TARGET_DURATION_DRIFT_THRESHOLD,
     AdEpisodeScript,
@@ -194,8 +195,10 @@ class ScriptGenerator:
 
         # 三分支同口径解析一次：作为 prompt 的时长约束文本，并据此构造 duration 枚举硬约束的 schema。
         supported_durations = self._resolve_supported_durations(caps)
+        reference_max_duration: int | None = None
 
         if gen_mode == "reference_video":
+            reference_max_duration = self._resolve_max_duration(caps)
             prompt = build_reference_video_prompt(
                 project_overview=self.project_json.get("overview", {}),
                 style=self.project_json.get("style", ""),
@@ -206,7 +209,7 @@ class ScriptGenerator:
                 units_md=step1_md,
                 supported_durations=supported_durations,
                 max_refs=self._resolve_max_refs(caps),
-                max_duration=self._resolve_max_duration(caps),
+                max_duration=reference_max_duration,
                 aspect_ratio=self._resolve_aspect_ratio(),
                 episode=episode,
             )
@@ -250,7 +253,13 @@ class ScriptGenerator:
             )
             schema = build_episode_script_model("drama", supported_durations)
 
-        return await self._generate_and_save(prompt, schema, episode, output_filename)
+        return await self._generate_and_save(
+            prompt,
+            schema,
+            episode,
+            output_filename,
+            reference_max_duration=reference_max_duration,
+        )
 
     async def _generate_and_save(
         self,
@@ -258,6 +267,8 @@ class ScriptGenerator:
         schema: type,
         episode: int,
         output_filename: str | None,
+        *,
+        reference_max_duration: int | None = None,
     ) -> Path:
         """调用 TextBackend → 解析校验 → 补元数据 → 经写盘统一入口保存（各内容模式共用尾段）。"""
         assert self.generator is not None  # generate() 入口已检查
@@ -277,11 +288,15 @@ class ScriptGenerator:
         # 解析并验证响应
         script_data = self._parse_response(response_text, episode)
 
-        # 补充元数据
-        script_data = self._add_metadata(script_data, episode)
-
-        # reference_video 模式：将 LLM 生成的简单 shots[].text 替换为精品提示词格式
+        # reference_video 模式：先按模型上限拆分 raw units，再为每个拆分后的 unit
+        # 单独套精品提示词。这样 17s 这类超上限内容不会被压回一个 17s 单 shot。
         if self.content_mode != "ad" and self._effective_generation_mode(episode) == "reference_video":
+            normalize_reference_video_script(
+                script_data,
+                episode=episode,
+                project=self.project_json,
+                max_duration=reference_max_duration,
+            )
             try:
                 from lib.reference_video.premium_prompt import apply_premium_prompt_to_unit
 
@@ -290,6 +305,9 @@ class ScriptGenerator:
                         apply_premium_prompt_to_unit(unit, self.project_json)
             except Exception:
                 logger.warning("精品提示词后处理失败，保留原版提示词", exc_info=True)
+
+        # 补充元数据
+        script_data = self._add_metadata(script_data, episode)
 
         # 经写盘统一入口保存：整集生成无「改前」，按严格结构校验（等价原 response_schema 的
         # Pydantic 校验），并继承 metadata 重算、加锁、filename↔episode 一致性与 project.json
@@ -691,11 +709,13 @@ class ScriptGenerator:
             for unit in (script_data.get("video_units") or []):
                 if not isinstance(unit, dict):
                     continue
-                if unit.get("video_prompt_source") not in ("skill",):
+                if unit.get("video_prompt_source") == "skill":
+                    continue
+                else:
                     unit["video_prompt_source"] = "pending"
-                for shot in (unit.get("shots") or []):
-                    if isinstance(shot, dict):
-                        shot["text"] = ""
+                    for shot in (unit.get("shots") or []):
+                        if isinstance(shot, dict):
+                            shot["text"] = ""
             return
 
         shape = script_shape(script_data.get("content_mode", "narration"))

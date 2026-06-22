@@ -6,7 +6,7 @@ import { useProjectsStore } from "@/stores/projects-store";
 import { useTasksStore } from "@/stores/tasks-store";
 import { useAppStore } from "@/stores/app-store";
 import { API } from "@/api";
-import type { ReferenceVideoUnit } from "@/types";
+import type { ReferenceResource, ReferenceVideoUnit } from "@/types";
 import type { ProjectData } from "@/types";
 
 function mkUnit(id: string, shotText = "x"): ReferenceVideoUnit {
@@ -30,6 +30,17 @@ function mkUnit(id: string, shotText = "x"): ReferenceVideoUnit {
   };
 }
 
+function mkPatchedUnit(
+  id: string,
+  patch: { prompt?: string; references?: ReferenceResource[] },
+): ReferenceVideoUnit {
+  return {
+    ...mkUnit(id, patch.prompt ?? "x"),
+    duration_override: true,
+    references: patch.references ?? [],
+  };
+}
+
 const STUB_PROJECT: ProjectData = {
   title: "p",
   content_mode: "narration",
@@ -38,6 +49,13 @@ const STUB_PROJECT: ProjectData = {
   characters: {},
   scenes: {},
   props: {},
+};
+
+const PROJECT_WITH_ASSETS: ProjectData = {
+  ...STUB_PROJECT,
+  characters: { 主角: { description: "", character_sheet: "characters/main.png" } },
+  scenes: { 酒馆: { description: "", scene_sheet: "scenes/tavern.png" } },
+  props: { 长剑: { description: "", prop_sheet: "props/sword.png" } },
 };
 
 describe("ReferenceVideoCanvas", () => {
@@ -91,9 +109,9 @@ describe("ReferenceVideoCanvas", () => {
     const addSpy = vi.spyOn(API, "addReferenceVideoUnit").mockResolvedValue({ unit: mkUnit("E1U1") });
     render(<ReferenceVideoCanvas projectName="proj" episode={1} />);
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /New Unit|新建 Unit/ })).toBeInTheDocument(),
+      expect(screen.getByRole("button", { name: /New Unit|新建 Unit|新建视频单元/ })).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByRole("button", { name: /New Unit|新建 Unit/ }));
+    fireEvent.click(screen.getByRole("button", { name: /New Unit|新建 Unit|新建视频单元/ }));
     await waitFor(() => expect(addSpy).toHaveBeenCalled());
   });
 
@@ -179,6 +197,63 @@ describe("ReferenceVideoCanvas", () => {
     await waitFor(() => {
       expect(useAppStore.getState().toast?.text).toMatch(/Queued for generation|已加入生成队列/);
     });
+  });
+
+  it("shows manual @mentions in the reference panel before saving", async () => {
+    useProjectsStore.setState({ currentProjectName: "proj", currentProjectData: PROJECT_WITH_ASSETS });
+    vi.spyOn(API, "listReferenceVideoUnits").mockResolvedValue({ units: [mkUnit("E1U1")] });
+    render(<ReferenceVideoCanvas projectName="proj" episode={1} />);
+
+    const ta = (await screen.findByRole("combobox")) as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Shot 1 (3s): @主角 推门" } });
+
+    expect(await screen.findByTitle("主角")).toBeInTheDocument();
+  });
+
+  it("saves prompt-derived @mentions as references", async () => {
+    useProjectsStore.setState({ currentProjectName: "proj", currentProjectData: PROJECT_WITH_ASSETS });
+    vi.spyOn(API, "listReferenceVideoUnits").mockResolvedValue({ units: [mkUnit("E1U1")] });
+    const patchSpy = vi.spyOn(API, "patchReferenceVideoUnit").mockImplementation(
+      async (projectName, episode, unitId, patch) => ({
+        unit: mkPatchedUnit(unitId, patch),
+      }),
+    );
+    render(<ReferenceVideoCanvas projectName="proj" episode={1} />);
+
+    const ta = (await screen.findByRole("combobox")) as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Shot 1 (3s): @主角 推门" } });
+    fireEvent.click(screen.getByRole("button", { name: /保存|Save/ }));
+
+    await waitFor(() => expect(patchSpy).toHaveBeenCalled());
+    expect(patchSpy).toHaveBeenLastCalledWith("proj", 1, "E1U1", {
+      prompt: "Shot 1 (3s): @主角 推门",
+      references: [{ type: "character", name: "主角" }],
+    });
+  });
+
+  it("auto-saves dirty prompt references before enqueueing generation", async () => {
+    useProjectsStore.setState({ currentProjectName: "proj", currentProjectData: PROJECT_WITH_ASSETS });
+    vi.spyOn(API, "listReferenceVideoUnits").mockResolvedValue({ units: [mkUnit("E1U1")] });
+    const patchSpy = vi.spyOn(API, "patchReferenceVideoUnit").mockImplementation(
+      async (_projectName, _episode, unitId, patch) => ({
+        unit: mkPatchedUnit(unitId, patch),
+      }),
+    );
+    const genSpy = vi
+      .spyOn(API, "generateReferenceVideoUnit")
+      .mockResolvedValue({ task_id: "t1", deduped: false });
+    render(<ReferenceVideoCanvas projectName="proj" episode={1} />);
+
+    const ta = (await screen.findByRole("combobox")) as HTMLTextAreaElement;
+    fireEvent.change(ta, { target: { value: "Shot 1 (3s): @主角 推门" } });
+    fireEvent.click(screen.getByRole("button", { name: /^(Generate video|生成视频)$/ }));
+
+    await waitFor(() => expect(genSpy).toHaveBeenCalledWith("proj", 1, "E1U1"));
+    expect(patchSpy).toHaveBeenCalledWith("proj", 1, "E1U1", {
+      prompt: "Shot 1 (3s): @主角 推门",
+      references: [{ type: "character", name: "主角" }],
+    });
+    expect(patchSpy.mock.invocationCallOrder[0]).toBeLessThan(genSpy.mock.invocationCallOrder[0]);
   });
 
   // 后台任务失败通知已统一迁移到全局 useTaskFailureNotifications hook（转变驱动 /

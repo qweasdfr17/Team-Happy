@@ -24,7 +24,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from lib.script_policy import PRESERVE_PROMPT_TAIL, is_preserve_mode
 from lib.episode_ledger import (
     backfill_episode_ledger,
     discover_episode_files,
@@ -33,6 +32,7 @@ from lib.episode_ledger import (
     parse_episode_num,
 )
 from lib.project_manager import ProjectManager, resolve_source_kind
+from lib.script_policy import PRESERVE_PROMPT_TAIL, is_preserve_mode
 from lib.text_backends.base import TextGenerationRequest, TextTaskType
 from lib.text_generator import TextGenerator
 from lib.text_metrics import count_reading_units

@@ -37,6 +37,7 @@ def _shot(shot_id: str, duration: int, **overrides) -> dict:
             "ambiance_audio": "",
             "dialogue": [],
         },
+        "video_prompt_source": "skill",
     }
     base.update(overrides)
     return base

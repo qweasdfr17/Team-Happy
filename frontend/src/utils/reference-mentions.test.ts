@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
+  appendReferenceMention,
+  deriveReferencesFromPrompt,
   extractMentions,
+  removeReferenceFromPrompt,
   resolveMentionType,
   mergeReferences,
+  syncPromptReferenceSection,
 } from "./reference-mentions";
 import type { ProjectData } from "@/types";
 import type { ReferenceResource } from "@/types/reference-video";
@@ -111,6 +115,77 @@ describe("mergeReferences", () => {
 
   it("returns empty list when prompt has no valid mentions", () => {
     expect(mergeReferences("Shot 1 (3s): plain", [], project)).toEqual([]);
+  });
+});
+
+describe("prompt/reference synchronization helpers", () => {
+  const project = mkProject();
+
+  it("derives references from manual @mentions in prompt order", () => {
+    const refs = deriveReferencesFromPrompt("Shot 1 (3s): @酒馆 内，@主角 拿起 @长剑", [], project);
+    expect(refs).toEqual([
+      { type: "scene", name: "酒馆" },
+      { type: "character", name: "主角" },
+      { type: "prop", name: "长剑" },
+    ]);
+  });
+
+  it("derives references from numbered image declarations even without @mentions", () => {
+    const refs = deriveReferencesFromPrompt(
+      "【图片引用声明】\n图片1：主角\n图片2：酒馆\n\n【画面内容】\n主角进入酒馆",
+      [],
+      project,
+    );
+    expect(refs).toEqual([
+      { type: "character", name: "主角" },
+      { type: "scene", name: "酒馆" },
+    ]);
+  });
+
+  it("preserves prompt declaration order instead of stale persisted order", () => {
+    const existing: ReferenceResource[] = [
+      { type: "scene", name: "酒馆" },
+      { type: "character", name: "主角" },
+    ];
+    const refs = deriveReferencesFromPrompt(
+      "【图片引用声明】\n图片1：主角\n图片2：酒馆",
+      existing,
+      project,
+    );
+    expect(refs).toEqual([
+      { type: "character", name: "主角" },
+      { type: "scene", name: "酒馆" },
+    ]);
+  });
+
+  it("appends panel-selected references as wrapped mentions", () => {
+    expect(appendReferenceMention("Shot 1 (3s): 推门", { type: "character", name: "主角" })).toBe(
+      "@[主角]\nShot 1 (3s): 推门",
+    );
+  });
+
+  it("rewrites the image declaration block to match reference order", () => {
+    const prompt = "【图片引用声明】\n图片1：酒馆\n图片2：主角\n\n【画面内容】\n[图1] 内";
+    expect(
+      syncPromptReferenceSection(prompt, [
+        { type: "character", name: "主角" },
+        { type: "scene", name: "酒馆" },
+      ]),
+    ).toBe("【图片引用声明】\n图片1：主角\n图片2：酒馆\n\n【画面内容】\n[图1] 内");
+  });
+
+  it("does not consume the next section when the declaration block is empty", () => {
+    const prompt = "【图片引用声明】\n【画面内容】\n主角推门";
+    expect(syncPromptReferenceSection(prompt, [{ type: "character", name: "主角" }])).toBe(
+      "【图片引用声明】\n图片1：主角\n【画面内容】\n主角推门",
+    );
+  });
+
+  it("removes both declaration lines and @mentions for the removed reference", () => {
+    const prompt = "【图片引用声明】\n图片1：主角\n图片2：酒馆\n\n@[主角] 进入 @酒馆";
+    expect(removeReferenceFromPrompt(prompt, { type: "character", name: "主角" })).toBe(
+      "【图片引用声明】\n图片2：酒馆\n\n进入 @酒馆",
+    );
   });
 });
 

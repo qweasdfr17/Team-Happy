@@ -1,38 +1,43 @@
-import BailianColor from "@lobehub/icons/es/Bailian/components/Color";
-import GeminiColor from "@lobehub/icons/es/Gemini/components/Color";
-import GrokMono from "@lobehub/icons/es/Grok/components/Mono";
-import MinimaxColor from "@lobehub/icons/es/Minimax/components/Color";
-import OpenAIMono from "@lobehub/icons/es/OpenAI/components/Mono";
-import VertexAIColor from "@lobehub/icons/es/VertexAI/components/Color";
-import ViduColor from "@lobehub/icons/es/Vidu/components/Color";
-import VolcengineColor from "@lobehub/icons/es/Volcengine/components/Color";
+import { PresetIcon } from "@/components/agent/PresetIcon";
+import { PROVIDER_DISPLAY_NAMES_ZH } from "@/utils/model-display";
 
-export const PROVIDER_NAMES: Record<string, string> = {
-  "gemini-aistudio": "AI Studio",
-  "gemini-vertex": "Vertex AI",
-  ark: "火山方舟",
-  grok: "Grok",
+export const PROVIDER_NAMES: Record<string, string> = PROVIDER_DISPLAY_NAMES_ZH;
+
+const PROVIDER_ICON_KEYS: Record<string, string> = {
+  ark: "Volcengine",
+  dashscope: "Bailian",
+  minimax: "Minimax",
   openai: "OpenAI",
   vidu: "Vidu",
 };
 
+function providerIconKey(providerId: string): string | null {
+  if (providerId === "gemini-vertex") return "VertexAI";
+  if (providerId.startsWith("gemini")) return "Gemini";
+  if (providerId.startsWith("grok")) return "Grok";
+  return PROVIDER_ICON_KEYS[providerId] ?? null;
+}
+
 /**
- * 根据 providerId 渲染对应的供应商图标。
+ * 根据 providerId 渲染对应供应商图标。
  * 支持 gemini-aistudio、gemini-vertex、grok、ark、dashscope、minimax、openai、vidu，其余显示首字母。
  */
-export function ProviderIcon({ providerId, className }: { providerId: string; className?: string }) {
+export function ProviderIcon({
+  providerId,
+  className,
+  size = 24,
+}: {
+  providerId: string;
+  className?: string;
+  size?: number;
+}) {
   const cls = className ?? "h-6 w-6";
-  if (providerId === "gemini-vertex") return <VertexAIColor className={cls} />;
-  if (providerId.startsWith("gemini")) return <GeminiColor className={cls} />;
-  if (providerId.startsWith("grok")) return <GrokMono className={cls} />;
-  if (providerId === "ark") return <VolcengineColor className={cls} />;
-  if (providerId === "dashscope") return <BailianColor className={cls} />;
-  if (providerId === "minimax") return <MinimaxColor className={cls} />;
-  if (providerId === "openai") return <OpenAIMono className={cls} />;
-  if (providerId === "vidu") return <ViduColor className={cls} />;
-  // Fallback: first letter badge
+  const iconKey = providerIconKey(providerId);
+  if (iconKey) return <PresetIcon iconKey={iconKey} size={size} className={cls} />;
   return (
-    <span className={`inline-flex items-center justify-center rounded border border-hairline-soft bg-bg-grad-b/70 text-xs font-bold uppercase text-text-2 ${cls}`}>
+    <span
+      className={`inline-flex items-center justify-center rounded border border-hairline-soft bg-bg-grad-b/70 text-xs font-bold uppercase text-text-2 ${cls}`}
+    >
       {providerId[0]}
     </span>
   );

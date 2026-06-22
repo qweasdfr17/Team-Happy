@@ -17,7 +17,7 @@ import { PhaseStepper } from "./PhaseStepper";
 
 import { API } from "@/api";
 import { ArchiveDiagnosticsDialog } from "@/components/shared/ArchiveDiagnosticsDialog";
-import { rememberAssetLibraryReturnTo } from "@/components/pages/AssetLibraryPage";
+import { rememberAssetLibraryReturnTo } from "@/utils/asset-library-return";
 import { costEntries, formatCostOrZero, formatCurrencyAmount } from "@/utils/cost-format";
 import type { ExportDiagnostics, WorkspaceNotification } from "@/types";
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 from typing import Any
 
 from lib.asset_types import ASSET_SPECS
-from lib.context_pack.models import SCHEMA_VERSION, empty_context_pack
-from lib.preflight.checks import _has_sheet, _has_any_product_images, _is_empty_prompt
+from lib.context_pack.models import empty_context_pack
+from lib.preflight.checks import _has_any_product_images, _has_sheet, _is_empty_prompt
 
 
 def build_context_pack(project: dict, script: dict, *, source_script: str = "") -> dict[str, Any]:

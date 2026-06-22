@@ -78,6 +78,11 @@ export const i18nReady = i18n
   .init({
     fallbackLng: 'zh',
     supportedLngs: SUPPORTED_LANGUAGES,
+    detection: {
+      order: ['localStorage'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'i18nextLng',
+    },
     debug: false,
     interpolation: { escapeValue: false },
     defaultNS: 'common',

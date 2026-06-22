@@ -42,7 +42,7 @@ interface SectionDef {
 }
 
 interface SectionGroup {
-  kicker: string;
+  kickerKey: string;
   items: SectionDef[];
 }
 
@@ -52,7 +52,7 @@ interface SectionGroup {
 
 const SECTION_GROUPS: SectionGroup[] = [
   {
-    kicker: "Configuration",
+    kickerKey: "dashboard:settings_group_configuration",
     items: [
       { id: "providers", labelKey: "dashboard:providers", Icon: Plug },
       { id: "agent", labelKey: "dashboard:agents", Icon: Bot },
@@ -60,14 +60,14 @@ const SECTION_GROUPS: SectionGroup[] = [
     ],
   },
   {
-    kicker: "Access",
+    kickerKey: "dashboard:settings_group_access",
     items: [
       { id: "usage", labelKey: "dashboard:usage", Icon: BarChart3 },
       { id: "api-keys", labelKey: "dashboard:api_keys", Icon: KeyRound },
     ],
   },
   {
-    kicker: "System",
+    kickerKey: "dashboard:settings_group_system",
     items: [{ id: "about", labelKey: "dashboard:about", Icon: Info }],
   },
 ];
@@ -153,7 +153,7 @@ export function SystemConfigPage() {
           <span aria-hidden className="h-5 w-px bg-hairline-soft" />
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent-2">
-              Control Booth — {currentLang.toUpperCase()}
+              {t("dashboard:system_config_kicker")} - {langDisplay}
             </div>
             <h1
               className="font-editorial mt-0.5"
@@ -180,7 +180,7 @@ export function SystemConfigPage() {
           >
             <Languages className="h-3.5 w-3.5" />
             <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.14em]">
-              {currentLang}
+              {langDisplay}
             </span>
           </button>
         </div>
@@ -195,9 +195,9 @@ export function SystemConfigPage() {
           style={{ background: "oklch(0.16 0.010 265 / 0.45)" }}
         >
           {SECTION_GROUPS.map((group, gi) => (
-            <div key={group.kicker} className={gi > 0 ? "mt-5" : undefined}>
+            <div key={group.kickerKey} className={gi > 0 ? "mt-5" : undefined}>
               <div className="mb-2 px-3 font-mono text-[9.5px] font-bold uppercase tracking-[0.16em] text-text-4">
-                {group.kicker}
+                {t(group.kickerKey)}
               </div>
               {group.items.map(({ id, labelKey, Icon }) => {
                 const isActive = activeSection === id;

@@ -20,7 +20,6 @@ from lib.db.base import DEFAULT_USER_ID
 from lib.path_safety import safe_exists
 from lib.prompt_builders import append_product_fidelity_tail, append_video_negative_tail
 from lib.reference_video import assemble_shots_text, render_prompt_for_backend
-from lib.reference_video.reference_inference import infer_references_from_prompt_text
 from lib.reference_video.ad_units import (
     ad_unit_prompt_override,
     render_ad_unit_prompt,
@@ -28,6 +27,7 @@ from lib.reference_video.ad_units import (
     resolve_ad_unit_shots,
 )
 from lib.reference_video.errors import MissingReferenceError
+from lib.reference_video.reference_inference import infer_references_from_prompt_text
 from lib.script_editor import ScriptEditError
 from lib.script_models import ReferenceResource, ad_script_total_duration
 from lib.thumbnail import extract_video_thumbnail
@@ -92,32 +92,27 @@ def _render_unit_prompt(unit: dict) -> str:
     rendered = render_prompt_for_backend(raw, references)
     if not rendered.strip():
         raise ValueError("reference video unit prompt is empty: all shots[*].text are blank")
-    labels = [
-        f"{ASSET_SPECS.get(ref.type).label_zh if ref.type in ASSET_SPECS else ref.type}「{ref.name}」设计图"
-        for ref in references
-    ]
-    legend = render_reference_legend(labels)
-    if legend:
-        rendered = f"{rendered}\n\n{legend}"
     return append_video_negative_tail(rendered)
 
 
-def _merge_inferred_references(inferred: list[dict], existing: list[dict]) -> list[dict]:
-    """推断引用排前，旧引用中未覆盖的继续保留，避免部分推断误删参考图。"""
+def _merge_inferred_references(inferred: list[dict], declared: object) -> list[dict]:
+    """Prefer prompt order, but keep declared refs that were not mentioned."""
+    declared_refs = [r for r in declared if isinstance(r, dict)] if isinstance(declared, list) else []
+    if not inferred:
+        return declared_refs
+
     merged: list[dict] = []
     seen: set[tuple[str, str]] = set()
-    for ref in [*inferred, *existing]:
-        if not isinstance(ref, dict):
-            continue
+    for ref in [*inferred, *declared_refs]:
         rtype = ref.get("type")
-        rname = ref.get("name")
-        if not isinstance(rtype, str) or not isinstance(rname, str) or not rtype or not rname:
+        name = ref.get("name")
+        if not isinstance(rtype, str) or not isinstance(name, str):
             continue
-        key = (rtype, rname)
+        key = (rtype, name)
         if key in seen:
             continue
         seen.add(key)
-        merged.append({"type": rtype, "name": rname})
+        merged.append(ref)
     return merged
 
 
@@ -192,7 +187,7 @@ async def resolve_max_unit_duration(project: dict) -> int | None:
 def _resolve_ad_unit_reference_entries(
     project: dict,
     project_path: Path,
-    references: list[dict],
+    references: list[object],
 ) -> tuple[list[dict], list[dict]]:
     """ad 派生 unit 的参考解析：返回 ``(entries, warnings)``。
 
@@ -329,6 +324,10 @@ async def execute_reference_video_task(
     if not script_file:
         raise ValueError("script_file is required for reference_video task")
 
+    from lib.prompt_source_guard import assert_video_prompt_skill_generated_from_payload
+
+    assert_video_prompt_skill_generated_from_payload(payload, resource_id)
+
     # 1. 加载上下文（阻塞 IO，线程池）
     def _load():
         pm = get_project_manager()
@@ -360,11 +359,10 @@ async def execute_reference_video_task(
         # 成品提示词中"图1/图2"声明不一致导致参考图错位
         raw_prompt = assemble_shots_text(unit.get("shots") or [])
         inferred = infer_references_from_prompt_text(project, raw_prompt) if raw_prompt else []
-        existing_refs = unit.get("references") or []
-        effective_refs = _merge_inferred_references(inferred, existing_refs) if inferred else existing_refs
+        effective_refs = _merge_inferred_references(inferred, unit.get("references"))
         source_refs = _resolve_unit_references(project, project_path, effective_refs)
         # 如果是推断出来的引用，写回脚本 JSON 使 UI 红框同步显示
-        if inferred and effective_refs != existing_refs:
+        if inferred and effective_refs != (unit.get("references") or []):
             unit["references"] = effective_refs
             try:
                 pm = get_project_manager()

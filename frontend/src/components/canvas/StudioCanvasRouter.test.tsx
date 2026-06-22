@@ -331,23 +331,23 @@ describe("StudioCanvasRouter", () => {
     });
 
     const viewCharacters = renderAt("/characters");
-    expect(screen.getByTestId("character-card")).toHaveAttribute("data-name", "Hero");
+    expect(await screen.findByTestId("character-card")).toHaveAttribute("data-name", "Hero");
     viewCharacters.unmount();
 
     const viewScenes = renderAt("/scenes");
-    expect(screen.getByTestId("scene-card")).toHaveAttribute("data-name", "Temple");
+    expect(await screen.findByTestId("scene-card")).toHaveAttribute("data-name", "Temple");
     viewScenes.unmount();
 
     const viewProps = renderAt("/props");
-    expect(screen.getByTestId("prop-card")).toHaveAttribute("data-name", "Sword");
+    expect(await screen.findByTestId("prop-card")).toHaveAttribute("data-name", "Sword");
     viewProps.unmount();
 
     const viewSource = renderAt("/source/source%20file.txt");
-    expect(screen.getByTestId("source-file-viewer")).toHaveTextContent("source file.txt");
+    expect(await screen.findByTestId("source-file-viewer")).toHaveTextContent("source file.txt");
     viewSource.unmount();
 
     const viewEpisodes = renderAt("/episodes/1");
-    expect(screen.getByTestId("timeline-canvas")).toBeInTheDocument();
+    expect(await screen.findByTestId("timeline-canvas")).toBeInTheDocument();
     expect(screen.getByTestId("timeline-has-script")).toHaveTextContent("yes");
     viewEpisodes.unmount();
 
@@ -374,7 +374,7 @@ describe("StudioCanvasRouter", () => {
 
     renderAt("/characters");
 
-    fireEvent.click(screen.getByText("update-character"));
+    fireEvent.click(await screen.findByText("update-character"));
     await waitFor(() => {
       expect(API.updateCharacter).toHaveBeenCalledWith("demo", "Hero", {
         description: "new desc",
@@ -422,7 +422,7 @@ describe("StudioCanvasRouter", () => {
 
     renderAt("/scenes");
 
-    fireEvent.click(screen.getByText("update-scene"));
+    fireEvent.click(await screen.findByText("update-scene"));
     await waitFor(() => {
       expect(API.updateProjectScene).toHaveBeenCalledWith("demo", "Temple", {
         description: "new scene desc",
@@ -454,7 +454,7 @@ describe("StudioCanvasRouter", () => {
 
     renderAt("/props");
 
-    fireEvent.click(screen.getByText("update-prop"));
+    fireEvent.click(await screen.findByText("update-prop"));
     await waitFor(() => {
       expect(API.updateProjectProp).toHaveBeenCalledWith("demo", "Sword", {
         description: "new prop desc",
@@ -491,7 +491,7 @@ describe("StudioCanvasRouter", () => {
     const addSpy = vi.spyOn(API, "addProjectProduct").mockResolvedValue({ success: true });
 
     renderAt("/products");
-    expect(screen.getByTestId("products-page")).toHaveAttribute("data-names", "Phone");
+    expect(await screen.findByTestId("products-page")).toHaveAttribute("data-names", "Phone");
 
     fireEvent.click(screen.getByText("update-product"));
     await waitFor(() => {
@@ -540,7 +540,7 @@ describe("StudioCanvasRouter", () => {
 
     renderAt("/products");
 
-    fireEvent.click(screen.getByText("update-product"));
+    fireEvent.click(await screen.findByText("update-product"));
     await waitFor(() => {
       expect(useAppStore.getState().toast?.text).toContain("更新产品失败");
       expect(useAppStore.getState().toast?.tone).toBe("error");
@@ -574,13 +574,13 @@ describe("StudioCanvasRouter", () => {
 
     renderAt("/episodes/1");
 
-    fireEvent.click(screen.getByText("update-prompt"));
+    fireEvent.click(await screen.findByText("update-prompt"));
     await waitFor(() => {
       expect(API.updateSegment).toHaveBeenCalledWith("demo", "SEG-1", {
         script_file: "episode_1.json",
         image_prompt: "new prompt",
       });
-      expect(useAppStore.getState().toast?.text).toContain("更新 Prompt 失败");
+      expect(useAppStore.getState().toast?.text).toContain("更新提示词失败");
     });
 
     fireEvent.click(screen.getByText("generate-storyboard"));

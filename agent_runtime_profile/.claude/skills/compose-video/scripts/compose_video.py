@@ -18,6 +18,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(errors="backslashreplace")
+
 
 def _find_repo_root(start: Path) -> Path:
     """向上回溯定位含 pyproject.toml 的目录，覆盖源/物化/editable 三种部署形态。"""

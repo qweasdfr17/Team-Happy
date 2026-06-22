@@ -13,8 +13,9 @@ from claude_agent_sdk import tool
 
 from lib.asset_types import BUCKET_KEY
 from lib.reference_video import parse_prompt
+from lib.reference_video.duration_guard import normalize_reference_video_script, resolve_reference_video_max_duration
+from lib.reference_video.prompt_text_cleaner import clean_cn_prompt_spacing, clean_shot_texts
 from server.agent_runtime.sdk_tools._context import ToolContext, tool_error, validate_script_filename
-
 
 _DECLARED_IMAGE_RE = re.compile(r"(?:图片|图|image|img)\s*([0-9０-９]+)", re.IGNORECASE)
 _MENTION_RE = re.compile(r"@\[([^\]\r\n]+)\]|@([A-Za-z0-9_\u4e00-\u9fff]+)")
@@ -62,8 +63,10 @@ def _apply_prompt_to_unit(unit: dict, prompt: str, duration_seconds: int | None,
         pass
 
     unit["shots"] = [s.model_dump() for s in shots]
+    clean_shot_texts(unit["shots"])
     unit["duration_seconds"] = sum(s.duration for s in shots)
     unit["duration_override"] = override
+    unit["video_prompt_source"] = "skill"
 
     if refs is not None:
         unit["references"] = refs
@@ -147,7 +150,7 @@ def _apply_prompt_to_ad_reference_unit(unit: dict, prompt: str, refs: list | Non
     ``shots[]``.  Store the agent-authored prompt as an override so generation
     can prefer it without rewriting the mother script or shot fields.
     """
-    cleaned = prompt.strip()
+    cleaned = clean_cn_prompt_spacing(prompt.strip())
     if not cleaned:
         raise ValueError("prompt 不能为空")
     unit["prompt_override"] = cleaned
@@ -207,6 +210,12 @@ def patch_reference_video_unit_prompt_tool(ctx: ToolContext):
                         inferred = _infer_refs_from_text(project, prompt)
                         refs = inferred or unit.get("references")
                     _apply_prompt_to_unit(unit, prompt, duration_seconds, refs)
+                    normalize_reference_video_script(
+                        script,
+                        episode=episode,
+                        project=project,
+                        max_duration=resolve_reference_video_max_duration(project),
+                    )
 
             return {
                 "content": [{

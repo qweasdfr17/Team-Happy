@@ -1,10 +1,8 @@
 """资产引用预检（lib/preflight/checks.py）单元测试。"""
 
-import pytest
 
 from lib.preflight.checks import run_preflight
 from lib.preflight.models import Severity
-
 
 # ── helpers ───────────────────────────────────────────────────────────────
 

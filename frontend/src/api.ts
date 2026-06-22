@@ -319,6 +319,29 @@ function withAuthQuery(url: string): string {
   return `${url}${sep}token=${encodeURIComponent(token)}`;
 }
 
+async function readJsonResponse<T>(response: Response, url: string): Promise<T> {
+  const contentType = response.headers.get("content-type") ?? "";
+  const bodyText = await response.text();
+  if (!bodyText.trim()) {
+    return undefined as T;
+  }
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    const preview = bodyText.trim().slice(0, 120);
+    throw new Error(`接口返回的不是 JSON：${url}，状态码 ${response.status}，返回内容开头：${preview}`);
+  }
+
+  try {
+    return JSON.parse(bodyText) as T;
+  } catch (error) {
+    const preview = bodyText.trim().slice(0, 120);
+    throw new Error(
+      `接口 JSON 解析失败：${url}，状态码 ${response.status}，返回内容开头：${preview}`,
+      { cause: error },
+    );
+  }
+}
+
 class API {
   /**
    * 通用请求方法
@@ -353,7 +376,7 @@ class API {
     if (response.status === 204) {
       return undefined as T;
     }
-    return response.json() as Promise<T>;
+    return readJsonResponse<T>(response, url);
   }
 
   // ==================== 系统配置 ====================

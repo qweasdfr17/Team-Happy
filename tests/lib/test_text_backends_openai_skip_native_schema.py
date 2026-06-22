@@ -1,6 +1,5 @@
 """OpenAI backend — skip native json_schema for DeepSeek/custom providers 测试。"""
 
-import pytest
 
 from lib.text_backends.openai import _should_skip_native_schema
 

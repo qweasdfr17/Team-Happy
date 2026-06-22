@@ -372,6 +372,7 @@ class AdReferenceUnit(BaseModel):
     unit_id: str = Field(description="格式 E{集}U{序号}")
     shot_ids: list[str] = Field(min_length=1, max_length=4, description="成员镜头 ID（连续、1-4 个）")
     references: list[AdUnitReference] = Field(default_factory=list, description="继承的参考集，产品在前")
+    video_prompt_source: SkipJsonSchema[Literal["pending", "skill"]] = Field(default="pending")
     generated_assets: GeneratedAssets = Field(default_factory=GeneratedAssets, description="生成资源状态")
 
 

@@ -28,7 +28,12 @@ import { useAppStore } from "@/stores/app-store";
 import { useProjectsStore } from "@/stores/projects-store";
 import { useCostStore } from "@/stores/cost-store";
 import { errMsg } from "@/utils/async";
-import { mergeReferences } from "@/utils/reference-mentions";
+import {
+  appendReferenceMention,
+  deriveReferencesFromPrompt,
+  removeReferenceFromPrompt,
+  syncPromptReferenceSection,
+} from "@/utils/reference-mentions";
 import type {
   ReferenceResource,
   ReferenceVideoUnit,
@@ -187,6 +192,21 @@ export function ReferenceVideoCanvas({
       });
       setStackTab("preview");
       try {
+        const unit = units.find((u) => u.unit_id === unitId);
+        const key = draftKey(projectName, episode, unitId);
+        const draftText = drafts[key];
+        const hasDraft = unit !== undefined && draftText !== undefined && draftText !== unitPromptText(unit);
+        if (unit && hasDraft) {
+          const refs = deriveReferencesFromPrompt(draftText, unit.references, project ?? null);
+          const prompt = syncPromptReferenceSection(draftText, refs);
+          await patchUnit(projectName, episode, unitId, { prompt, references: refs });
+          setDrafts((d) => {
+            if (d[key] !== draftText) return d;
+            const copy = { ...d };
+            delete copy[key];
+            return copy;
+          });
+        }
         const { deduped } = await generate(projectName, episode, unitId);
         useAppStore
           .getState()
@@ -204,7 +224,7 @@ export function ReferenceVideoCanvas({
         toastError(e, (msg) => t("reference_generate_request_failed", { error: msg }));
       }
     },
-    [generate, projectName, episode, t],
+    [drafts, generate, patchUnit, project, projectName, episode, t, units],
   );
 
   const handleUploadVideo = useCallback(
@@ -284,6 +304,14 @@ export function ReferenceVideoCanvas({
     return drafts[draftKey(projectName, episode, selected.unit_id)] ?? base;
   }, [selected, drafts, projectName, episode]);
 
+  const currentReferences = useMemo(
+    () =>
+      selected
+        ? deriveReferencesFromPrompt(currentText, selected.references, project ?? null)
+        : [],
+    [currentText, project, selected],
+  );
+
   const isDirty = !!(selected && dirtyMap[selected.unit_id]);
 
   // 单 shot unit：秒数修改。duration_override 时直接 patchUnit；
@@ -304,8 +332,9 @@ export function ReferenceVideoCanvas({
           duration_seconds: newSec,
         };
         if (hasPromptDraft) {
-          body.prompt = draftText!;
-          body.references = mergeReferences(draftText!, selected.references, project ?? null);
+          const refs = deriveReferencesFromPrompt(draftText, selected.references, project ?? null);
+          body.prompt = syncPromptReferenceSection(draftText, refs);
+          body.references = refs;
         }
         setSaving(true);
         patchUnit(projectName, episode, selected.unit_id, body)
@@ -350,11 +379,12 @@ export function ReferenceVideoCanvas({
     const key = draftKey(projectName, episode, unitId);
     const draftText = drafts[key];
     if (draftText === undefined || draftText === unitPromptText(selected)) return;
-    const nextRefs = mergeReferences(draftText, selected.references, project ?? null);
+    const nextRefs = deriveReferencesFromPrompt(draftText, selected.references, project ?? null);
+    const prompt = syncPromptReferenceSection(draftText, nextRefs);
     setSaving(true);
     try {
       await patchUnit(projectName, episode, unitId, {
-        prompt: draftText,
+        prompt,
         references: nextRefs,
       });
       setDrafts((d) => {
@@ -370,22 +400,15 @@ export function ReferenceVideoCanvas({
     }
   }, [selected, drafts, project, patchUnit, projectName, episode]);
 
-  // Reference reorder/add/remove flushes immediately, carrying any pending prompt draft.
-  const patchReferencesAtomic = useCallback(
-    (unitId: string, nextRefs: ReferenceResource[]) => {
+  // Reference reorder/add/remove flushes prompt + references together.
+  const patchPromptAndReferencesAtomic = useCallback(
+    (unitId: string, prompt: string, nextRefs: ReferenceResource[]) => {
       const key = draftKey(projectName, episode, unitId);
-      const draftText = drafts[key];
-      const unit = units.find((u) => u.unit_id === unitId);
-      const hasDraft =
-        draftText !== undefined && unit !== undefined && draftText !== unitPromptText(unit);
-      const body: { prompt?: string; references: ReferenceResource[] } = hasDraft
-        ? { prompt: draftText, references: nextRefs }
-        : { references: nextRefs };
-      void patchUnit(projectName, episode, unitId, body)
+      const syncedPrompt = syncPromptReferenceSection(prompt, nextRefs);
+      setSaving(true);
+      void patchUnit(projectName, episode, unitId, { prompt: syncedPrompt, references: nextRefs })
         .then(() => {
-          if (!hasDraft) return;
           setDrafts((d) => {
-            if (d[key] !== draftText) return d;
             const copy = { ...d };
             delete copy[key];
             return copy;
@@ -393,38 +416,42 @@ export function ReferenceVideoCanvas({
         })
         .catch((e) => {
           toastError(e);
-        });
+        })
+        .finally(() => setSaving(false));
     },
-    [drafts, units, patchUnit, projectName, episode],
+    [patchUnit, projectName, episode],
   );
 
   const handleReorderRefs = useCallback(
     (next: ReferenceResource[]) => {
       if (!selected) return;
-      patchReferencesAtomic(selected.unit_id, next);
+      patchPromptAndReferencesAtomic(selected.unit_id, currentText, next);
     },
-    [patchReferencesAtomic, selected],
+    [currentText, patchPromptAndReferencesAtomic, selected],
   );
 
   const handleRemoveRef = useCallback(
     (ref: ReferenceResource) => {
       if (!selected) return;
-      const next = selected.references.filter(
+      const nextText = removeReferenceFromPrompt(currentText, ref);
+      const seedRefs = currentReferences.filter(
         (r) => !(r.name === ref.name && r.type === ref.type),
       );
-      patchReferencesAtomic(selected.unit_id, next);
+      const nextRefs = deriveReferencesFromPrompt(nextText, seedRefs, project ?? null);
+      patchPromptAndReferencesAtomic(selected.unit_id, nextText, nextRefs);
     },
-    [patchReferencesAtomic, selected],
+    [currentReferences, currentText, patchPromptAndReferencesAtomic, project, selected],
   );
 
   const handleAddRef = useCallback(
     (ref: ReferenceResource) => {
       if (!selected) return;
-      if (selected.references.some((r) => r.type === ref.type && r.name === ref.name)) return;
-      const next = [...selected.references, ref];
-      patchReferencesAtomic(selected.unit_id, next);
+      if (currentReferences.some((r) => r.type === ref.type && r.name === ref.name)) return;
+      const nextText = appendReferenceMention(currentText, ref);
+      const nextRefs = deriveReferencesFromPrompt(nextText, currentReferences, project ?? null);
+      patchPromptAndReferencesAtomic(selected.unit_id, nextText, nextRefs);
     },
-    [patchReferencesAtomic, selected],
+    [currentReferences, currentText, patchPromptAndReferencesAtomic, project, selected],
   );
 
   // Reset tab to units on project/episode change (render-time derived-state pattern).
@@ -774,7 +801,7 @@ export function ReferenceVideoCanvas({
                     {(!stackPreview || stackTab === "editor") && (
                       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                         <ReferencePanel
-                          references={selected.references}
+                          references={currentReferences}
                           projectName={projectName}
                           onReorder={handleReorderRefs}
                           onRemove={handleRemoveRef}

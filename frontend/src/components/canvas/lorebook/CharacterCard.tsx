@@ -64,7 +64,6 @@ export function CharacterCard({
   const [uploadingSheet, setUploadingSheet] = useState(false);
   const [deletingSheet, setDeletingSheet] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [uploadingVoice, setUploadingVoice] = useState(false);
   const [deletingVoice, setDeletingVoice] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -517,6 +516,7 @@ export function CharacterCard({
           <div className="mt-1.5">
             <audio controls className="w-full" style={{ height: 32 }}>
               <source src={voiceUrl} />
+              <track kind="captions" />
             </audio>
           </div>
         ) : (
@@ -874,61 +874,85 @@ function VariantSection({
       )}
       {variants.length > 0 && (
         <div className="mt-1.5 space-y-1.5">
-          {variants.map((v) => {
-            const sheetUrl = v.character_sheet ? API.getFileUrl(projectName, v.character_sheet) : null;
-            const sheetInputRef = useRef<HTMLInputElement>(null);
-            return (
-              <div key={v.id} className="rounded-lg p-2" style={{ background: "oklch(0.18 0.010 265 / 0.25)", border: "1px solid var(--color-hairline-soft)" }}>
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[12px] font-medium" style={{ color: "var(--color-text)" }}>{v.label}</div>
-                    {v.description && <div className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-4)" }}>{v.description}</div>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete(v.id, v.label)}
-                    title={t("assets:delete_variant")}
-                    className="focus-ring shrink-0 rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.05)]"
-                    style={{ color: "var(--color-text-4)" }}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  {sheetUrl ? (
-                    <PreviewableImageFrame src={sheetUrl} alt={v.label}>
-                      <img src={sheetUrl} alt={v.label} className="h-14 w-24 rounded object-cover" style={{ border: "1px solid var(--color-hairline-soft)" }} />
-                    </PreviewableImageFrame>
-                  ) : (
-                    <div className="flex h-14 w-24 items-center justify-center rounded" style={{ border: "1px dashed var(--color-hairline)", color: "var(--color-text-4)" }}>
-                      <span className="text-[10px]">{t("assets:upload_variant_sheet")}</span>
-                    </div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => sheetInputRef.current?.click()}
-                    className="focus-ring rounded px-2 py-0.5 text-[11px]"
-                    style={{ color: "var(--color-text-3)", border: "1px solid var(--color-hairline)" }}
-                  >
-                    {sheetUrl ? t("replace") : t("assets:upload_sheet_short")}
-                  </button>
-                  <input
-                    ref={sheetInputRef}
-                    type="file"
-                    accept=".png,.jpg,.jpeg,.webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) void handleSheetUpload(v.id, f);
-                    }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+          {variants.map((variant) => (
+            <VariantRow
+              key={variant.id}
+              variant={variant}
+              projectName={projectName}
+              onDelete={handleDelete}
+              onSheetUpload={handleSheetUpload}
+              t={t}
+            />
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function VariantRow({
+  variant,
+  projectName,
+  onDelete,
+  onSheetUpload,
+  t,
+}: {
+  variant: NonNullable<Character["variants"]>[number];
+  projectName: string;
+  onDelete: (variantId: string, variantLabel: string) => Promise<void>;
+  onSheetUpload: (variantId: string, file: File) => Promise<void>;
+  t: (key: string, vars?: Record<string, string>) => string;
+}) {
+  const sheetInputRef = useRef<HTMLInputElement>(null);
+  const sheetUrl = variant.character_sheet ? API.getFileUrl(projectName, variant.character_sheet) : null;
+
+  return (
+    <div className="rounded-lg p-2" style={{ background: "oklch(0.18 0.010 265 / 0.25)", border: "1px solid var(--color-hairline-soft)" }}>
+      <div className="flex items-start justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-medium" style={{ color: "var(--color-text)" }}>{variant.label}</div>
+          {variant.description && <div className="mt-0.5 text-[11px]" style={{ color: "var(--color-text-4)" }}>{variant.description}</div>}
+        </div>
+        <button
+          type="button"
+          onClick={() => void onDelete(variant.id, variant.label)}
+          title={t("assets:delete_variant")}
+          className="focus-ring shrink-0 rounded p-0.5 hover:bg-[oklch(1_0_0_/_0.05)]"
+          style={{ color: "var(--color-text-4)" }}
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
+      <div className="mt-1.5 flex items-center gap-2">
+        {sheetUrl ? (
+          <PreviewableImageFrame src={sheetUrl} alt={variant.label}>
+            <img src={sheetUrl} alt={variant.label} className="h-14 w-24 rounded object-cover" style={{ border: "1px solid var(--color-hairline-soft)" }} />
+          </PreviewableImageFrame>
+        ) : (
+          <div className="flex h-14 w-24 items-center justify-center rounded" style={{ border: "1px dashed var(--color-hairline)", color: "var(--color-text-4)" }}>
+            <span className="text-[10px]">{t("assets:upload_variant_sheet")}</span>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => sheetInputRef.current?.click()}
+          className="focus-ring rounded px-2 py-0.5 text-[11px]"
+          style={{ color: "var(--color-text-3)", border: "1px solid var(--color-hairline)" }}
+        >
+          {sheetUrl ? t("replace") : t("assets:upload_sheet_short")}
+        </button>
+        <input
+          ref={sheetInputRef}
+          type="file"
+          accept=".png,.jpg,.jpeg,.webp"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void onSheetUpload(variant.id, file);
+          }}
+        />
+      </div>
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
 } from "@floating-ui/react";
 import { ProviderIcon } from "@/components/ui/ProviderIcon";
 import { DROPDOWN_PANEL_STYLE } from "@/components/ui/darkroom-tokens";
+import { formatBackendDisplay, formatModelDisplayName, localizeProviderName } from "@/utils/model-display";
 import { UI_LAYERS } from "@/utils/ui-layers";
 
 interface ProviderModelSelectProps {
@@ -134,12 +135,15 @@ export function ProviderModelSelect({
     if (!q) return grouped;
     const out: Record<string, string[]> = {};
     for (const [providerId, models] of Object.entries(grouped)) {
-      const providerLabel = (providerNames[providerId] || providerId).toLowerCase();
-      if (providerLabel.includes(q)) {
+      const providerLabel = localizeProviderName(providerId, providerNames[providerId]).toLowerCase();
+      if (providerLabel.includes(q) || providerId.toLowerCase().includes(q)) {
         out[providerId] = models;
         continue;
       }
-      const matched = models.filter((m) => m.toLowerCase().includes(q));
+      const matched = models.filter((m) => {
+        const modelLabel = formatModelDisplayName(providerId, m).toLowerCase();
+        return modelLabel.includes(q) || m.toLowerCase().includes(q);
+      });
       if (matched.length > 0) out[providerId] = matched;
     }
     return out;
@@ -294,19 +298,15 @@ export function ProviderModelSelect({
     [open, flatOptions, activeIndex, selectOption, handleListKeyDown],
   );
 
-  const slashIdx = value ? value.indexOf("/") : -1;
-  const currentProvider = slashIdx !== -1 ? value.slice(0, slashIdx) : "";
-  const currentModel = slashIdx !== -1 ? value.slice(slashIdx + 1) : "";
-
   const fbSlashIdx = !value && fallbackValue ? fallbackValue.indexOf("/") : -1;
   const fbProvider = fbSlashIdx !== -1 ? fallbackValue!.slice(0, fbSlashIdx) : "";
   const fbModel = fbSlashIdx !== -1 ? fallbackValue!.slice(fbSlashIdx + 1) : "";
   const showFallback = !value && fbSlashIdx !== -1;
 
   const displayText = value
-    ? `${providerNames[currentProvider] || currentProvider} · ${currentModel}`
+    ? formatBackendDisplay(value, providerNames)
     : showFallback
-      ? `${t("follow_global_default")} · ${providerNames[fbProvider] || fbProvider} · ${fbModel}`
+      ? `${t("follow_global_default")} · ${formatBackendDisplay(`${fbProvider}/${fbModel}`, providerNames)}`
       : resolvedPlaceholder;
 
   const activeDescendantId =
@@ -415,7 +415,7 @@ export function ProviderModelSelect({
                   className="flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-text-4 bg-bg-grad-a/35"
                 >
                   <ProviderIcon providerId={providerId} className="h-3.5 w-3.5" />
-                  {providerNames[providerId] || providerId}
+                  {localizeProviderName(providerId, providerNames[providerId])}
                 </div>
                 {/* Model options */}
                 {models.map((model) => {
@@ -433,6 +433,7 @@ export function ProviderModelSelect({
                       id={`${listboxId}-option-${currentFlatIdx}`}
                       role="option"
                       aria-selected={isSelected}
+                      aria-label={`${formatModelDisplayName(providerId, model)} ${model}`}
                       type="button"
                       onClick={() => selectOption(fullValue)}
                       onMouseEnter={() => setActiveIndex(currentFlatIdx)}
@@ -447,7 +448,7 @@ export function ProviderModelSelect({
                       ) : (
                         <span className="h-3.5 w-3.5 shrink-0" />
                       )}
-                      <span className="truncate">{model}</span>
+                      <span className="truncate" title={model}>{formatModelDisplayName(providerId, model)}</span>
                     </button>
                   );
                 })}

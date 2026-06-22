@@ -145,7 +145,6 @@ class _FakePMWithFiles:
     """支持 _clear_asset_sheet / voice reference 的 FakePM。"""
 
     def __init__(self, tmp_path):
-        import json
 
         self.tmp_path = tmp_path
         self.projects: dict[str, dict] = {}
@@ -178,6 +177,7 @@ class _FakePMWithFiles:
 
     def _clear_asset_sheet(self, asset_type: str, project_name: str, name: str):
         from pathlib import Path
+
         from lib.asset_types import ASSET_SPECS
 
         spec = ASSET_SPECS[asset_type]
@@ -671,9 +671,8 @@ class TestCostumeEdit:
                 "/api/v1/projects/demo/characters/Alice/costumes",
                 data={"label": "原图"},
                 files={"file": ("old.png", b"old", "image/png")},
-            )
+        )
         cid = resp.json()["costume"]["id"]
-        old_path = resp.json()["costume"]["image_path"]
         # 替换图片
         with client:
             resp = client.post(
@@ -681,7 +680,6 @@ class TestCostumeEdit:
                 files={"file": ("new.png", b"newdata", "image/png")},
             )
         assert resp.status_code == 200
-        refs = pm.projects["demo"]["characters"]["Alice"]["costume_references"]
         # 同扩展名时路径不变，但文件被新内容覆盖
         new_path = resp.json()["path"]
         assert (tmp_path / "demo" / new_path).exists()

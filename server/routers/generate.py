@@ -216,7 +216,8 @@ async def generate_video(
 
         await asyncio.to_thread(_sync)
 
-        from lib.prompt_source_guard import PromptSourceGuardError as _PGSE, assert_video_prompt_skill_generated
+        from lib.prompt_source_guard import PromptSourceGuardError as _PGSE
+        from lib.prompt_source_guard import assert_video_prompt_skill_generated
 
         try:
             assert_video_prompt_skill_generated(_guard_item, segment_id)

@@ -10,6 +10,7 @@ import { API } from "@/api";
 import { useAppStore } from "@/stores/app-store";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { errMsg } from "@/utils/async";
+import { takeAssetLibraryReturnTo } from "@/utils/asset-library-return";
 import {
   ACCENT_BTN_CLS,
   ACCENT_BTN_SM_CLS,
@@ -19,15 +20,6 @@ import {
   ambientGlowStyle,
 } from "@/components/ui/darkroom-tokens";
 import type { Asset, AssetType } from "@/types/asset";
-
-const ASSET_LIBRARY_RETURN_TO_KEY = "assetLibrary:returnTo";
-
-/** 入口按钮点击前调用，记录返回目标。只接受应用内部路径，避免 open redirect 风险。 */
-export function rememberAssetLibraryReturnTo(pathname: string) {
-  if (pathname.startsWith("/app/")) {
-    sessionStorage.setItem(ASSET_LIBRARY_RETURN_TO_KEY, pathname);
-  }
-}
 
 interface TabDef {
   type: AssetType;
@@ -197,8 +189,7 @@ export function AssetLibraryPage() {
             <button
               type="button"
               onClick={() => {
-                const returnTo = sessionStorage.getItem(ASSET_LIBRARY_RETURN_TO_KEY);
-                sessionStorage.removeItem(ASSET_LIBRARY_RETURN_TO_KEY);
+                const returnTo = takeAssetLibraryReturnTo();
                 navigate(returnTo && returnTo.startsWith("/app/") ? returnTo : "/app/projects");
               }}
               aria-label={t("back_to_projects")}

@@ -8,6 +8,7 @@ import { ProviderIcon } from "@/components/ui/ProviderIcon";
 import { CredentialList } from "@/components/pages/CredentialList";
 import { ACCENT_BTN_CLS, ACCENT_BUTTON_STYLE, GHOST_BTN_CLS, INPUT_CLS } from "@/components/ui/darkroom-tokens";
 import { FieldLabel } from "@/components/ui/FieldLabel";
+import { localizeProviderName } from "@/utils/model-display";
 import type { ProviderConfigDetail, ProviderField } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -365,7 +366,7 @@ export function ProviderDetail({ providerId, onSaved }: Props) {
                 color: "var(--color-text)",
               }}
             >
-              {detail.display_name}
+              {localizeProviderName(providerId, detail.display_name)}
             </h3>
             <StatusBadge status={detail.status} />
           </div>

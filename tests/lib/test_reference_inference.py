@@ -1,6 +1,5 @@
 """reference_inference — 从成品提示词推断 reference 绑定 单元测试。"""
 
-import pytest
 
 from lib.reference_video.reference_inference import infer_references_from_prompt_text
 

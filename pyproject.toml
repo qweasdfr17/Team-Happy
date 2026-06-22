@@ -82,7 +82,14 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 120
-exclude = [".worktrees", ".claude/worktrees"]
+exclude = [
+    ".worktrees",
+    ".claude/worktrees",
+    "release",
+    "projects",
+    "frontend/node_modules",
+    "frontend/dist",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
@@ -95,6 +102,7 @@ exclude = [
     ".venv",
     ".worktrees",
     ".claude/worktrees",
+    "release",
     "frontend",
     "projects",
     "agent_runtime_profile",

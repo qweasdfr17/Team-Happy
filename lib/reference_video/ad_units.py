@@ -45,6 +45,13 @@ def _unit_references(shots: list[dict]) -> list[dict]:
     return references
 
 
+def _unit_video_prompt_source(shots: list[dict]) -> str | None:
+    """Return a derived source only when member shots carry source markers."""
+    if not shots or not any("video_prompt_source" in shot for shot in shots):
+        return None
+    return "skill" if all(shot.get("video_prompt_source") == "skill" for shot in shots) else "pending"
+
+
 def derive_ad_reference_units(
     shots: object,
     *,
@@ -92,14 +99,18 @@ def derive_ad_reference_units(
     if current:
         groups.append(current)
 
-    return [
-        {
+    units: list[dict] = []
+    for n, group in enumerate(groups, start=1):
+        unit = {
             "unit_id": f"E{episode}U{n}",
             "shot_ids": [s["shot_id"] for s in group],
             "references": _unit_references(group),
         }
-        for n, group in enumerate(groups, start=1)
-    ]
+        video_prompt_source = _unit_video_prompt_source(group)
+        if video_prompt_source is not None:
+            unit["video_prompt_source"] = video_prompt_source
+        units.append(unit)
+    return units
 
 
 def merge_ad_reference_units(existing: object, derived: list[dict]) -> list[dict]:
@@ -122,12 +133,13 @@ def merge_ad_reference_units(existing: object, derived: list[dict]) -> list[dict
             isinstance(prev, dict)
             and prev.get("shot_ids") == unit["shot_ids"]
             and prev.get("references") == unit["references"]
+            and prev.get("video_prompt_source") == unit.get("video_prompt_source")
         )
         assets = None
-        if same_identity and isinstance(prev.get("generated_assets"), dict):
+        if same_identity and prev is not None and isinstance(prev.get("generated_assets"), dict):
             assets = dict(prev["generated_assets"])
         merged_unit = {**unit, "generated_assets": assets or GeneratedAssets().model_dump()}
-        if same_identity:
+        if same_identity and prev is not None:
             prompt_override = prev.get("prompt_override")
             if isinstance(prompt_override, str) and prompt_override.strip():
                 merged_unit["prompt_override"] = prompt_override

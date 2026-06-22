@@ -16,12 +16,12 @@ def _project(tmp_path: Path, *, novel: str | None = NOVEL) -> Path:
     d = tmp_path / "demo"
     (d / "source").mkdir(parents=True)
     if novel is not None:
-        (d / "source" / "novel.txt").write_text(novel, encoding="utf-8")
+        (d / "source" / "novel.txt").write_text(novel, encoding="utf-8", newline="")
     return d
 
 
 def _write_episode(project_dir: Path, num: int, text: str) -> None:
-    (project_dir / "source" / f"episode_{num}.txt").write_text(text, encoding="utf-8")
+    (project_dir / "source" / f"episode_{num}.txt").write_text(text, encoding="utf-8", newline="")
 
 
 def _write_script(project_dir: Path, rel_path: str) -> None:

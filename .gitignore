@@ -10,6 +10,9 @@ build/
 eggs/
 *.egg
 .installed.cfg
+.mypy_cache/
+.pyright/
+.hypothesis/
 
 # Virtual environments
 venv/
@@ -28,7 +31,6 @@ env/
 Thumbs.db
 
 # Project specific
-projects
 projects/*
 vertex_keys/*
 !vertex_keys/.gitkeep
@@ -55,18 +57,38 @@ projects/.agent_data/*.db.bak
 
 # Environment
 .env
+frontend/.env
 .env.local
 .env.*
 !.env.example
+!frontend/.env.example
 CLAUDE.local.md
 
 # Local Codex runtime metadata
 .codex/
 
 # Frontend build artifacts
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+frontend/coverage/
+frontend/*.tsbuildinfo
+.pnpm-store/
+.npm/
+.yarn/
+.turbo/
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+frontend/package-lock.json
+
+# Portable package artifacts
+release/*.zip
+release/*/
 
 # Git backup
 .git.backup

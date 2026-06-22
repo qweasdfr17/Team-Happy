@@ -1,8 +1,9 @@
-"""Hard guard: block image/video generation unless prompt was created by new skill.
+"""Guard prompt generation by source marker.
 
-All three enqueue paths (SDK / WebUI / Worker) must call these assertions before
-sending any prompt to an image or video model.  Only ``source == "skill"`` passes;
-anything else — including missing, ``"pending"``, or ``"legacy"`` — is rejected.
+All enqueue paths should pass through these assertions before sending prompts to
+an image or video model. Explicit non-skill markers are rejected; missing markers
+are treated as legacy data so old projects remain runnable until their prompts
+are regenerated and tagged.
 """
 
 from __future__ import annotations
@@ -15,6 +16,11 @@ _IMAGE_GUARD_MESSAGE = (
 _VIDEO_GUARD_MESSAGE = (
     "当前分镜没有经新提示词 skill 生成的 video_prompt，禁止生成视频: {item_id}"
 )
+_LEGACY_ALLOWED = {None, ""}
+
+
+def _is_allowed_source(source: Any) -> bool:
+    return source == "skill" or source in _LEGACY_ALLOWED
 
 
 class PromptSourceGuardError(ValueError):
@@ -22,18 +28,18 @@ class PromptSourceGuardError(ValueError):
 
 
 def assert_image_prompt_skill_generated(item: dict[str, Any], item_id: str) -> None:
-    """Hard-check: ``image_prompt_source`` must be ``"skill"``."""
+    """Reject explicit non-skill ``image_prompt_source`` markers."""
     source = item.get("image_prompt_source")
-    if source != "skill":
+    if not _is_allowed_source(source):
         raise PromptSourceGuardError(
             _IMAGE_GUARD_MESSAGE.format(item_id=item_id)
         )
 
 
 def assert_video_prompt_skill_generated(item: dict[str, Any], item_id: str) -> None:
-    """Hard-check: ``video_prompt_source`` must be ``"skill"``."""
+    """Reject explicit non-skill ``video_prompt_source`` markers."""
     source = item.get("video_prompt_source")
-    if source != "skill":
+    if not _is_allowed_source(source):
         raise PromptSourceGuardError(
             _VIDEO_GUARD_MESSAGE.format(item_id=item_id)
         )
@@ -42,10 +48,11 @@ def assert_video_prompt_skill_generated(item: dict[str, Any], item_id: str) -> N
 def assert_video_prompt_skill_generated_from_payload(payload: dict[str, Any], item_id: str) -> None:
     """Check ``video_prompt_source`` from task payload (execution-layer guard).
 
-    Payload is written at enqueue time; if the marker is missing treat as pending.
+    Payload is written at enqueue time. Missing marker means an old caller or old
+    queued task; keep it compatible, but reject explicit pending/legacy markers.
     """
     source = payload.get("video_prompt_source") or payload.get("prompt_source")
-    if source != "skill":
+    if not _is_allowed_source(source):
         raise PromptSourceGuardError(
             _VIDEO_GUARD_MESSAGE.format(item_id=item_id)
         )
@@ -54,7 +61,7 @@ def assert_video_prompt_skill_generated_from_payload(payload: dict[str, Any], it
 def assert_image_prompt_skill_generated_from_payload(payload: dict[str, Any], item_id: str) -> None:
     """Check ``image_prompt_source`` from task payload (execution-layer guard)."""
     source = payload.get("image_prompt_source") or payload.get("prompt_source")
-    if source != "skill":
+    if not _is_allowed_source(source):
         raise PromptSourceGuardError(
             _IMAGE_GUARD_MESSAGE.format(item_id=item_id)
         )

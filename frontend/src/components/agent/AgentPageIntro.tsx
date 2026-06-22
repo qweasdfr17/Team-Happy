@@ -1,7 +1,7 @@
-import ClaudeColor from "@lobehub/icons/es/Claude/components/Color";
 import { Terminal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { PresetIcon } from "@/components/agent/PresetIcon";
 import { CARD_STYLE } from "@/components/ui/darkroom-tokens";
 
 export function AgentPageIntro() {
@@ -16,7 +16,7 @@ export function AgentPageIntro() {
             boxShadow: "inset 0 1px 0 oklch(1 0 0 / 0.04)",
           }}
         >
-          <ClaudeColor size={28} />
+          <PresetIcon iconKey="Claude" size={28} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent-2">

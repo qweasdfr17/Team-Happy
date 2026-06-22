@@ -147,7 +147,7 @@ export function MediaModelSection() {
       {/* Heading */}
       <div>
         <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent-2">
-          Default Routing
+          {t("model_routing_kicker")}
         </div>
         <h3
           className="font-editorial mt-1"
@@ -167,7 +167,7 @@ export function MediaModelSection() {
       </div>
 
       {/* Video */}
-      <SectionCard kicker="Video Channel" title={t("default_video_model")}>
+      <SectionCard kicker={t("video_channel_kicker")} title={t("default_video_model")}>
         {videoBackends.length > 0 ? (
           <ProviderModelSelect
             value={currentVideo}
@@ -200,7 +200,7 @@ export function MediaModelSection() {
       </SectionCard>
 
       {/* Image */}
-      <SectionCard kicker="Image Channel" title={t("default_image_model")}>
+      <SectionCard kicker={t("image_channel_kicker")} title={t("default_image_model")}>
         {imageBackends.length > 0 ? (
           <ImageModelDualSelect
             valueT2I={currentImageT2I}
@@ -228,7 +228,7 @@ export function MediaModelSection() {
       </SectionCard>
 
       {/* Text */}
-      <SectionCard kicker="Text Channel" title={t("text_models")} description={t("text_models_desc")}>
+      <SectionCard kicker={t("text_channel_kicker")} title={t("text_models")} description={t("text_models_desc")}>
         {textBackends.length > 0 ? (
           <div className="space-y-3.5">
             {TEXT_MODEL_FIELDS.map(([key, label]) => (
@@ -254,7 +254,7 @@ export function MediaModelSection() {
       </SectionCard>
 
       {/* Audio (narration TTS) */}
-      <SectionCard kicker="Audio Channel" title={t("default_audio_model")}>
+      <SectionCard kicker={t("audio_channel_kicker")} title={t("default_audio_model")}>
         {audioBackends.length > 0 ? (
           <ProviderModelSelect
             value={currentAudioBackend}

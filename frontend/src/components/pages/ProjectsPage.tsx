@@ -37,7 +37,7 @@ import { WARM_TONE } from "@/utils/severity-tone";
 import { getProjectDisplayName } from "@/utils/project-display";
 import { CreateProjectModal } from "./CreateProjectModal";
 import { OpenClawModal } from "./OpenClawModal";
-import { rememberAssetLibraryReturnTo } from "./AssetLibraryPage";
+import { rememberAssetLibraryReturnTo } from "@/utils/asset-library-return";
 import { ICON_BTN_FILLED_CLS, posterGridStyle } from "@/components/ui/darkroom-tokens";
 import { BRAND } from "@/branding";
 import {

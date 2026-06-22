@@ -178,7 +178,7 @@ export function buildFlowMap(input: FlowMapInput): { nodes: Node[]; edges: Edge[
   nodes.push({
     id: "prompts", type: "default",
     position: { x: RIGHT_X, y: 40 + Y_STEP },
-    data: { ...promptDetail, label: "✏️ 提示词生成", sub: shotCount > 0 ? `${shotCount} 镜头` : unitCount > 0 ? `${unitCount} units` : "未开始", detail: promptDetail },
+    data: { ...promptDetail, label: "✏️ 提示词生成", sub: shotCount > 0 ? `${shotCount} 镜头` : unitCount > 0 ? `${unitCount} 个视频单元` : "未开始", detail: promptDetail },
     style: { background: statusColor(shotStatus), color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 },
   });
   edges.push({ id: "e-source-prompts", source: "source", target: "prompts" });
@@ -193,7 +193,7 @@ export function buildFlowMap(input: FlowMapInput): { nodes: Node[]; edges: Edge[
     nodes.push({
       id: "ref-video", type: "default",
       position: { x: RIGHT_X, y: 40 + 2 * Y_STEP },
-      data: { ...refDetail, label: "🎥 参考生视频", sub: `${unitCount} units`, detail: refDetail },
+      data: { ...refDetail, label: "🎥 参考生视频", sub: `${unitCount} 个视频单元`, detail: refDetail },
       style: { background: statusColor("active"), color: "#fff", border: "none", borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 },
     });
     edges.push({ id: "e-prompts-ref", source: "prompts", target: "ref-video" });

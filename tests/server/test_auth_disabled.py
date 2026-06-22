@@ -1,10 +1,9 @@
 """Auth bypass tests for AUTH_ENABLED=false (local no-login mode)."""
 
-import os
 
 import pytest
 
-from server.auth import CurrentUserInfo, _anonymous_user, is_auth_enabled
+from server.auth import _anonymous_user, is_auth_enabled
 
 
 def test_is_auth_enabled_defaults_true(monkeypatch):

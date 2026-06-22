@@ -13,6 +13,7 @@ user-invocable: true
 - 输入：单集剧本原文（source/episode_N.txt 或 scripts/episode_N.json）
 - 输出：镜头列表 + image_prompt + video_prompt + 资产引用
 - **不负责**：分集规划、规范化剧本、生成视频
+- **调用场景**：系统内部需要从已分集的 episode script 拆 shots 时使用，本 skill 是底层工具
 
 ## script_policy 遵守
 

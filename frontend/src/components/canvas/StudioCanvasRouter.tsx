@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { lazy, Suspense, useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { errMsg, voidPromise } from "@/utils/async";
 import { Route, Switch, Redirect } from "wouter";
 import { useTranslation } from "react-i18next";
@@ -6,17 +6,6 @@ import { useProjectsStore } from "@/stores/projects-store";
 import { useAppStore } from "@/stores/app-store";
 import { useConfigStatusStore } from "@/stores/config-status-store";
 import { useTasksStore } from "@/stores/tasks-store";
-import { TimelineCanvas } from "./timeline/TimelineCanvas";
-import { OverviewCanvas } from "./OverviewCanvas";
-import { SourceFileViewer } from "./SourceFileViewer";
-import { SourceFilesPage } from "./SourceFilesPage";
-import { CharactersPage } from "./lorebook/CharactersPage";
-import { ScenesPage } from "./lorebook/ScenesPage";
-import { PropsPage } from "./lorebook/PropsPage";
-import { ProductsPage } from "./lorebook/ProductsPage";
-import { ReferenceVideoCanvas } from "./reference/ReferenceVideoCanvas";
-import { GridImageToVideoCanvas } from "./grid/GridImageToVideoCanvas";
-import { ProjectFlowMap } from "./flow/ProjectFlowMap";
 import { API } from "@/api";
 import { buildEntityRevisionKey } from "@/utils/project-changes";
 import { getProviderModels, getCustomProviderModels, lookupSupportedDurations } from "@/utils/provider-models";
@@ -25,11 +14,35 @@ import type { Scene, Prop, Product, CustomProviderInfo, ProviderInfo } from "@/t
 import type { EpisodeScript } from "@/types/script";
 import { REFERENCE_SHOT_DURATION_OPTIONS } from "@/types/script";
 
+const TimelineCanvas = lazy(() => import("./timeline/TimelineCanvas").then((m) => ({ default: m.TimelineCanvas })));
+const OverviewCanvas = lazy(() => import("./OverviewCanvas").then((m) => ({ default: m.OverviewCanvas })));
+const SourceFileViewer = lazy(() => import("./SourceFileViewer").then((m) => ({ default: m.SourceFileViewer })));
+const SourceFilesPage = lazy(() => import("./SourceFilesPage").then((m) => ({ default: m.SourceFilesPage })));
+const CharactersPage = lazy(() => import("./lorebook/CharactersPage").then((m) => ({ default: m.CharactersPage })));
+const ScenesPage = lazy(() => import("./lorebook/ScenesPage").then((m) => ({ default: m.ScenesPage })));
+const PropsPage = lazy(() => import("./lorebook/PropsPage").then((m) => ({ default: m.PropsPage })));
+const ProductsPage = lazy(() => import("./lorebook/ProductsPage").then((m) => ({ default: m.ProductsPage })));
+const ReferenceVideoCanvas = lazy(() =>
+  import("./reference/ReferenceVideoCanvas").then((m) => ({ default: m.ReferenceVideoCanvas })),
+);
+const GridImageToVideoCanvas = lazy(() =>
+  import("./grid/GridImageToVideoCanvas").then((m) => ({ default: m.GridImageToVideoCanvas })),
+);
+const ProjectFlowMap = lazy(() => import("./flow/ProjectFlowMap").then((m) => ({ default: m.ProjectFlowMap })));
+
 // ---------------------------------------------------------------------------
 // resolveSegmentPrompt -- shared segment lookup for generate storyboard/video
 // ---------------------------------------------------------------------------
 
 type PromptField = "image_prompt" | "video_prompt";
+
+function CanvasRouteLoading() {
+  return (
+    <div className="flex h-full items-center justify-center text-[13px] text-text-4" aria-live="polite">
+      Loading canvas...
+    </div>
+  );
+}
 
 function resolveSegmentPrompt(
   scripts: Record<string, EpisodeScript>,
@@ -41,6 +54,7 @@ function resolveSegmentPrompt(
   if (!resolvedFile) return null;
   const script = scripts[resolvedFile];
   if (!script) return null;
+  if ("video_units" in script) return null;
   const seg =
     script.content_mode === "narration"
       ? script.segments.find((s) => s.segment_id === segmentId)
@@ -571,7 +585,8 @@ export function StudioCanvasRouter() {
   }
 
   return (
-    <Switch>
+    <Suspense fallback={<CanvasRouteLoading />}>
+      <Switch>
       <Route path="/">
         <OverviewCanvas
           projectName={currentProjectName}
@@ -745,6 +760,7 @@ export function StudioCanvasRouter() {
       <Route path="/flow-map">
         <ProjectFlowMap />
       </Route>
-    </Switch>
+      </Switch>
+    </Suspense>
   );
 }

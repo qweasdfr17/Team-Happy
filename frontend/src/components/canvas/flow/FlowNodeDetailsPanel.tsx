@@ -13,14 +13,6 @@ interface Props {
 export function FlowNodeDetailsPanel({ detail, onClose, onNavigate }: Props) {
   const { t } = useTranslation("dashboard");
 
-  const navigate = (path: string) => {
-    const base = window.location.hash.replace(/^#/, "");
-    const parts = base.split("/");
-    const projIdx = parts.indexOf("app") + 2; // /app/projects/{name}
-    const prefix = parts.slice(0, projIdx).join("/");
-    window.location.hash = "#/" + prefix + path;
-  };
-
   return (
     <div
       style={{
@@ -96,7 +88,7 @@ export function FlowNodeDetailsPanel({ detail, onClose, onNavigate }: Props) {
       {/* Navigate button */}
       {detail.targetPath && (
         <button
-          onClick={() => { navigate(detail.targetPath!); }}
+          onClick={() => { if (detail.targetPath) onNavigate(detail.targetPath); }}
           style={{
             display: "inline-flex", alignItems: "center", gap: 6,
             padding: "6px 14px", borderRadius: 6, border: "1px solid var(--color-hairline)",

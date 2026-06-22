@@ -19,6 +19,8 @@ import { useWarnUnsaved } from "@/hooks/useWarnUnsaved";
 import { normalizeMode, type GenerationMode } from "@/utils/generation-mode";
 import { getProjectDisplayName } from "@/utils/project-display";
 
+type ScriptPolicyMode = "preserve" | "suggest_rewrite" | "rewrite_approved";
+
 function deriveStyleValue(project: Record<string, unknown>, projectName: string): StylePickerValue {
   const styleImage = project.style_image as string | undefined;
   const templateId = (project.style_template_id as string | undefined) ?? null;
@@ -129,7 +131,7 @@ export function ProjectSettingsPage() {
   const [textStyle, setTextStyle] = useState<string>("");
   const [aspectRatio, setAspectRatio] = useState<string>("");
   const [generationMode, setGenerationMode] = useState<GenerationMode>("storyboard");
-  const [scriptPolicyMode, setScriptPolicyMode] = useState<"preserve"|"suggest_rewrite"|"rewrite_approved">("preserve");
+  const [scriptPolicyMode, setScriptPolicyMode] = useState<ScriptPolicyMode>("preserve");
   const [defaultDuration, setDefaultDuration] = useState<number | null>(null);
   const [videoResolution, setVideoResolution] = useState<string | null>(null);
   const [imageResolution, setImageResolution] = useState<string | null>(null);
@@ -151,7 +153,7 @@ export function ProjectSettingsPage() {
     defaultDuration: null as number | null,
     videoResolution: null as string | null,
     imageResolution: null as string | null,
-    scriptPolicyMode: "preserve" as string,
+    scriptPolicyMode: "preserve",
   });
   // 风格区独立保存，但"未保存就离开"也需被 isDirty 拦截。
   const initialStyleRef = useRef<StylePickerValue | null>(null);
@@ -212,7 +214,7 @@ export function ProjectSettingsPage() {
       // Mirror that here so the UI reflects the actually-effective ratio.
       const ar = rawAr || "9:16";
       const gm = normalizeMode(project.generation_mode);
-      const dd = project.default_duration != null ? (project.default_duration as number) : null;
+      const dd = typeof project.default_duration === "number" ? project.default_duration : null;
 
       setVideoBackend(vb);
       setImageBackendT2I(ibt2i);
@@ -229,7 +231,7 @@ export function ProjectSettingsPage() {
       setDefaultDuration(dd);
       setProjectTitle(typeof project.title === "string" ? project.title : "");
       setContentMode(typeof project.content_mode === "string" ? project.content_mode : "narration");
-      const sp = (project as Record<string, unknown>).script_policy as { mode?: string } | undefined;
+      const sp = project.script_policy as { mode?: string } | undefined;
       setScriptPolicyMode(sp?.mode === "suggest_rewrite" ? "suggest_rewrite" : sp?.mode === "rewrite_approved" ? "rewrite_approved" : "preserve");
 
       // model_settings 的 key 以 effective backend（override ‖ global default）读写，
@@ -438,7 +440,7 @@ export function ProjectSettingsPage() {
     } finally {
       setSaving(false);
     }
-  }, [modelSettings, videoBackend, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, textScript, textOverview, textStyle, aspectRatio, generationMode, defaultDuration, contentMode, videoResolution, imageResolution, projectName, t, globalDefaults.video, globalDefaults.imageT2I]);
+  }, [modelSettings, videoBackend, imageBackendT2I, imageBackendI2I, audioOverride, audioBackend, narrationVoice, narrationSpeed, textScript, textOverview, textStyle, aspectRatio, generationMode, defaultDuration, contentMode, videoResolution, imageResolution, scriptPolicyMode, projectName, t, globalDefaults.video, globalDefaults.imageT2I]);
 
   return (
     <div
@@ -475,7 +477,7 @@ export function ProjectSettingsPage() {
           <span aria-hidden className="h-5 w-px bg-hairline-soft" />
           <div className="min-w-0 flex-1">
             <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent-2">
-              Project Booth — {projectName.toUpperCase()}
+              {t("project_settings_kicker")} - {projectName.toUpperCase()}
             </div>
             <h1
               className="font-editorial mt-0.5 truncate"
@@ -512,7 +514,7 @@ export function ProjectSettingsPage() {
           {/* Style picker (independent save flow, mutually exclusive template / custom) */}
           {styleValue && (
             <SectionCard
-              kicker="Visual Style"
+              kicker={t("visual_style_kicker")}
               title={t("project_style_section_title")}
               footer={
                 <div className="flex items-center gap-3">
@@ -552,7 +554,7 @@ export function ProjectSettingsPage() {
           {options && (
             <>
               {/* Model config (video + duration + image + text) */}
-              <SectionCard kicker="Engine Routing" title={t("model_config")}>
+              <SectionCard kicker={t("engine_routing_kicker")} title={t("model_config")}>
                 <ModelConfigSection
                   value={{
                     videoBackend,
@@ -688,7 +690,7 @@ export function ProjectSettingsPage() {
               {/* 旁白配音（TTS）：仅 narration 模式消费——TTS 绑定 segment.novel_text，drama/ad 无该字段，
                   故与两个画布的批量旁白按钮（contentMode === "narration"）同口径门控，避免对无效模式展示配音卡 */}
               {contentMode === "narration" && (
-              <SectionCard kicker="Audio Channel" title={t("media_narration_title")}>
+              <SectionCard kicker={t("audio_channel_kicker")} title={t("media_narration_title")}>
                 <div className="space-y-4">
                   <div>
                     <div className="mb-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-text-4">

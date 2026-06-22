@@ -62,9 +62,9 @@ describe("AppRoutes", () => {
     expect(await screen.findByTestId("projects-page")).toBeInTheDocument();
   });
 
-  it("renders 404 for unknown routes", () => {
+  it("renders 404 for unknown routes", async () => {
     renderAt("/not-found");
-    expect(screen.getByText("404")).toBeInTheDocument();
+    expect(await screen.findByText("404")).toBeInTheDocument();
     expect(screen.getByText("页面未找到")).toBeInTheDocument();
   });
 

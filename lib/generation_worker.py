@@ -295,6 +295,9 @@ async def _extract_provider(task: dict[str, Any]) -> str:
     """
     project_name = task.get("project_name")
     payload = task.get("payload") or {}
+    if not project_name and not payload:
+        return DEFAULT_PROVIDER
+
     # 以 media lane 区分 video / audio / image：reference_video 等 task_type 同属 video lane。
     is_video = task.get("media_type") == "video" or task.get("task_type") in ("video", "reference_video")
     is_audio = task.get("media_type") == "audio" or task.get("task_type") == "tts"

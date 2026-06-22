@@ -10,7 +10,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 # ── 标签推断规则 ────────────────────────────────────────────────────────
 
 _TAG_RULES: list[tuple[str, list[str]]] = [

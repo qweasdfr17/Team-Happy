@@ -302,7 +302,7 @@ describe("ReferenceVideoCard combobox ARIA", () => {
     expect(ta).toHaveAttribute("aria-controls", "reference-editor-picker");
     expect(ta).toHaveAttribute("aria-autocomplete", "list");
     // aria-label 是短名，不是长 placeholder
-    expect(ta.getAttribute("aria-label")).toBe("Unit 提示词");
+    expect(ta.getAttribute("aria-label")).toBe("视频单元提示词");
 
     await user.clear(ta);
     await user.type(ta, "@");

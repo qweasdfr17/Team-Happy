@@ -105,8 +105,8 @@ def test_reference_video_script_rejects_legacy_reference_video_content_mode():
         )
 
 
-def test_reference_video_unit_rejects_more_than_three_shots():
-    many_shots = [Shot(duration=1, text=f"s{i}") for i in range(4)]
+def test_reference_video_unit_rejects_more_than_four_shots():
+    many_shots = [Shot(duration=1, text=f"s{i}") for i in range(5)]
     with pytest.raises(ValidationError):
         _make_unit(shots=many_shots)
 

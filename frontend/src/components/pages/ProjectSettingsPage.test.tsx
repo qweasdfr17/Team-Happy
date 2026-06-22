@@ -208,7 +208,7 @@ describe("ProjectSettingsPage – style picker", () => {
     // 项目无 image override + 全局默认双能力 → 单下拉模式（label = 图片模型 / Image Model）
     const imageTrigger = await screen.findByRole("combobox", { name: /^(图片模型|Image Model)$/ });
     expect(imageTrigger).toHaveTextContent(/跟随全局默认|Use global default/);
-    expect(imageTrigger).toHaveTextContent(/nano-banana/);
+    expect(imageTrigger).toHaveTextContent(/纳米香蕉图像/);
   });
 
   it("saves a template change via PATCH style_template_id", async () => {

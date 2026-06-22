@@ -2108,9 +2108,9 @@ class SessionManager:
         """Encode a project cwd the same way the SDK does for session storage.
 
         Uses the same scheme as transcript_reader.py and the SDK itself:
-        replace ``/`` and ``.`` with ``-``.
+        replace path separators, drive separators, and ``.`` with ``-``.
         """
-        return project_cwd.as_posix().replace("/", "-").replace(".", "-")
+        return project_cwd.as_posix().replace("/", "-").replace("\\", "-").replace(":", "-").replace(".", "-")
 
     # 沙箱网络默认允许的域名。所有 provider HTTP 调用已迁到 in-process MCP tool
     # （server/agent_runtime/sdk_tools/，主进程跑不经 sandbox，issue #519），所以
@@ -2283,6 +2283,7 @@ class SessionManager:
         return (
             str(_tempdir / "claude-"),
             str(_tempdir.resolve() / "claude-"),
+            str(Path("/tmp").resolve() / "claude-"),
             "/tmp/claude-",
             "/private/tmp/claude-",
         )
@@ -2323,7 +2324,18 @@ class SessionManager:
             if resolved.is_relative_to(sdk_project_dir) and "tool-results" in resolved.parts:
                 return True, None
         # SDK 后台任务输出例外（前缀计算见 _sdk_tmp_prefixes，进程内缓存一次）。
-        if str(resolved).startswith(self._sdk_tmp_prefixes) and "tasks" in resolved.parts:
+        resolved_s = self._normalize_path_for_protected_compare(resolved)
+        sdk_tmp_prefixes = tuple(
+            self._normalize_path_for_protected_compare(Path(prefix)) for prefix in self._sdk_tmp_prefixes
+        )
+        parts_lower = tuple(str(part).casefold() for part in resolved.parts)
+        is_tmp_claude_task = (
+            len(parts_lower) >= 4
+            and parts_lower[1] == "tmp"
+            and parts_lower[2].startswith("claude-")
+            and "tasks" in parts_lower
+        )
+        if (resolved_s.startswith(sdk_tmp_prefixes) or is_tmp_claude_task) and "tasks" in parts_lower:
             return True, None
         # projects_root 下：当前项目以外的子目录拒，根直放文件放行
         projects_root = self.projects_root

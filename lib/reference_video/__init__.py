@@ -7,6 +7,13 @@ from lib.reference_video.ad_units import (
     resolve_ad_unit_shots,
     sync_ad_reference_units,
 )
+from lib.reference_video.duration_guard import (
+    REFERENCE_VIDEO_HARD_MAX_DURATION,
+    normalize_reference_video_script,
+    normalize_reference_video_units,
+    resolve_reference_video_max_duration,
+    split_duration,
+)
 from lib.reference_video.errors import (
     MissingReferenceError,
     ProviderUnsupportedFeatureError,
@@ -25,15 +32,20 @@ __all__ = [
     "ad_unit_prompt_override",
     "MissingReferenceError",
     "ProviderUnsupportedFeatureError",
+    "REFERENCE_VIDEO_HARD_MAX_DURATION",
     "assemble_shots_text",
     "compute_duration_from_shots",
     "infer_references_from_prompt_text",
+    "normalize_reference_video_script",
+    "normalize_reference_video_units",
     "derive_ad_reference_units",
     "merge_ad_reference_units",
     "parse_prompt",
     "render_ad_unit_prompt",
     "render_prompt_for_backend",
+    "resolve_reference_video_max_duration",
     "resolve_ad_unit_shots",
     "resolve_references",
+    "split_duration",
     "sync_ad_reference_units",
 ]

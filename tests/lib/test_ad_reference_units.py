@@ -157,7 +157,30 @@ class TestReproducibility:
 
         units = derive_ad_reference_units(shots, episode=1)
 
-        assert set(units[0].keys()) == {"unit_id", "shot_ids", "references"}
+        assert "shots" not in units[0]
+        assert "prompt" not in units[0]
+        assert "video_prompt_source" not in units[0]
+        assert units[0]["shot_ids"] == ["E1S1"]
+
+    def test_video_prompt_source_is_skill_only_when_every_shot_is_skill(self):
+        shots = [
+            {**_shot("E1S1"), "video_prompt_source": "skill"},
+            {**_shot("E1S2"), "video_prompt_source": "skill"},
+        ]
+
+        units = derive_ad_reference_units(shots, episode=1)
+
+        assert units[0]["video_prompt_source"] == "skill"
+
+    def test_video_prompt_source_is_pending_when_any_marked_shot_is_not_skill(self):
+        shots = [
+            {**_shot("E1S1"), "video_prompt_source": "skill"},
+            {**_shot("E1S2"), "video_prompt_source": "pending"},
+        ]
+
+        units = derive_ad_reference_units(shots, episode=1)
+
+        assert units[0]["video_prompt_source"] == "pending"
 
     def test_dirty_shots_skipped_deterministically(self):
         shots = [

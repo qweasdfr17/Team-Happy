@@ -3,7 +3,7 @@ import { buildFlowMap } from "./build-flow-map";
 
 describe("buildFlowMap", () => {
   it("空项目生成基础节点", () => {
-    const { nodes, edges } = buildFlowMap({});
+    const { nodes } = buildFlowMap({});
     expect(nodes.length).toBeGreaterThanOrEqual(5);
     const ids = nodes.map((n) => n.id);
     expect(ids).toContain("source");

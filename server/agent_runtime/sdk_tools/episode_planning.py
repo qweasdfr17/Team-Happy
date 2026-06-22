@@ -260,7 +260,7 @@ def reset_episode_plan_tool(ctx: ToolContext):
                 if settings_cleared:
                     lines.append(f"规划设置已清除：{', '.join(settings_cleared)}")
                 if delete_files:
-                    lines.append(f"\n已删除派生文件：")
+                    lines.append("\n已删除派生文件：")
                     lines.append(f"  scripts/episode_*.json：{deleted_scripts} 个")
                     lines.append(f"  source/episode_*.txt：{deleted_sources} 个")
                     lines.append(f"  drafts/episode_*/：{deleted_drafts} 个")

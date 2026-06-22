@@ -57,6 +57,9 @@ class TestGridManager:
         """list_all returns grids in ascending created_at order."""
         gm = GridManager(tmp_path)
         grids = [_make_grid() for _ in range(3)]
+        grids[0].created_at = "2026-01-01T00:00:03+00:00"
+        grids[1].created_at = "2026-01-01T00:00:01+00:00"
+        grids[2].created_at = "2026-01-01T00:00:02+00:00"
         for g in grids:
             gm.save(g)
         loaded = gm.list_all()

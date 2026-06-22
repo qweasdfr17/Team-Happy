@@ -8,6 +8,7 @@ import type { CustomProviderInfo } from "@/types";
 import { useEndpointCatalogStore } from "@/stores/endpoint-catalog-store";
 import { formatDurationsLabel } from "@/utils/duration_format";
 import { formatDate } from "@/utils/date-format";
+import { formatModelDisplayName } from "@/utils/model-display";
 import { ACCENT_BTN_CLS, ACCENT_BUTTON_STYLE, CARD_STYLE, GHOST_BTN_CLS } from "@/components/ui/darkroom-tokens";
 import { CustomProviderForm } from "./CustomProviderForm";
 
@@ -165,7 +166,7 @@ export function CustomProviderDetail({ providerId, onDeleted, onSaved }: CustomP
                 </span>
               </div>
               <p className="mt-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-text-4">
-                {provider.discovery_format === "openai" ? "OPENAI" : "GOOGLE"} ·{" "}
+                {provider.discovery_format === "openai" ? t("discovery_format_openai") : t("discovery_format_google")} ·{" "}
                 <span className="normal-case tracking-normal">{provider.base_url}</span>
               </p>
             </div>
@@ -174,13 +175,13 @@ export function CustomProviderDetail({ providerId, onDeleted, onSaved }: CustomP
           {/* Info card */}
           <div className="rounded-[10px] border border-hairline p-5" style={CARD_STYLE}>
             <div className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent-2">
-              Connection
+              {t("connection_info_kicker")}
             </div>
             <div className="space-y-2 text-[12.5px]">
               <div className="flex justify-between gap-4">
                 <span className="text-text-3">{t("discovery_format_label")}</span>
                 <span className="text-text">
-                  {provider.discovery_format === "openai" ? "OpenAI" : "Google"}
+                  {provider.discovery_format === "openai" ? t("discovery_format_openai") : t("discovery_format_google")}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
@@ -218,7 +219,7 @@ export function CustomProviderDetail({ providerId, onDeleted, onSaved }: CustomP
                     style={CARD_STYLE}
                   >
                     <span className="min-w-0 flex-1 truncate font-mono text-[11.5px]">
-                      {m.model_id}
+                      {m.display_name || formatModelDisplayName(`custom-${provider.id}`, m.model_id)}
                     </span>
                     <span className="rounded-full border border-hairline-soft bg-bg-grad-a/55 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-text-3">
                       {(() => {

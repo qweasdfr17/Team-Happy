@@ -2,6 +2,7 @@ import { type ComponentType, useEffect, useState } from "react";
 
 interface IconProps {
   size?: number;
+  className?: string;
 }
 
 type IconLoader = () => Promise<{ default: ComponentType<IconProps> }>;
@@ -16,6 +17,7 @@ type IconLoader = () => Promise<{ default: ComponentType<IconProps> }>;
 const ICON_LOADERS: Record<string, IconLoader> = {
   Anthropic: () => import("@lobehub/icons/es/Anthropic/components/Mono"),
   Aws: () => import("@lobehub/icons/es/Aws/components/Color"),
+  Bailian: () => import("@lobehub/icons/es/Bailian/components/Color"),
   Bedrock: () => import("@lobehub/icons/es/Bedrock/components/Color"),
   ChatGLM: () => import("@lobehub/icons/es/ChatGLM/components/Color"),
   Claude: () => import("@lobehub/icons/es/Claude/components/Color"),
@@ -24,6 +26,7 @@ const ICON_LOADERS: Record<string, IconLoader> = {
   Doubao: () => import("@lobehub/icons/es/Doubao/components/Color"),
   Gemini: () => import("@lobehub/icons/es/Gemini/components/Color"),
   Google: () => import("@lobehub/icons/es/Google/components/Color"),
+  Grok: () => import("@lobehub/icons/es/Grok/components/Mono"),
   Hunyuan: () => import("@lobehub/icons/es/Hunyuan/components/Color"),
   Kimi: () => import("@lobehub/icons/es/Kimi/components/Color"),
   KwaiKAT: () => import("@lobehub/icons/es/KwaiKAT/components/Mono"),
@@ -39,6 +42,8 @@ const ICON_LOADERS: Record<string, IconLoader> = {
   Tencent: () => import("@lobehub/icons/es/Tencent/components/Color"),
   TencentCloud: () => import("@lobehub/icons/es/TencentCloud/components/Color"),
   Volcengine: () => import("@lobehub/icons/es/Volcengine/components/Color"),
+  VertexAI: () => import("@lobehub/icons/es/VertexAI/components/Color"),
+  Vidu: () => import("@lobehub/icons/es/Vidu/components/Color"),
   XiaomiMiMo: () => import("@lobehub/icons/es/XiaomiMiMo/components/Mono"),
   Zhipu: () => import("@lobehub/icons/es/Zhipu/components/Color"),
 };
@@ -95,8 +100,8 @@ export function PresetIcon({ iconKey, size = 20, className }: Props) {
   const Icon = loaded && loaded.key === iconKey ? loaded.component : null;
   if (Icon)
     return (
-      <span className={className}>
-        <Icon size={size} />
+      <span className={`inline-flex items-center justify-center ${className ?? ""}`}>
+        <Icon size={size} className={className} />
       </span>
     );
   // Monogram fallback

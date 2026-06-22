@@ -54,7 +54,9 @@ function AssetCardImpl({ asset, onEdit, onDelete }: Props) {
             {audioUrl ? (
               <div className="mt-2 flex items-center gap-2 rounded-[6px] border border-hairline-soft bg-bg-grad-b/45 px-2 py-1">
                 <AudioLines className="h-3.5 w-3.5 shrink-0 text-accent-2" />
-                <audio className="h-7 min-w-0 flex-1" src={audioUrl} controls preload="metadata" />
+                <audio className="h-7 min-w-0 flex-1" src={audioUrl} controls preload="metadata">
+                  <track kind="captions" />
+                </audio>
               </div>
             ) : null}
             {formattedDate ? (

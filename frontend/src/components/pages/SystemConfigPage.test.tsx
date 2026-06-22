@@ -119,7 +119,7 @@ describe("SystemConfigPage", () => {
   it("renders the page header", () => {
     renderPage();
     expect(screen.getByText("设置")).toBeInTheDocument();
-    expect(screen.getByText("系统配置与 API 访问管理")).toBeInTheDocument();
+    expect(screen.getByText("系统配置与接口访问管理")).toBeInTheDocument();
   });
 
   it("renders all 6 sidebar sections", () => {
@@ -181,7 +181,7 @@ describe("SystemConfigPage", () => {
       expect(screen.getByText("当前配置存在以下问题，可能会影响部分功能：")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(`${BRAND.name} 智能体 API Key`, { exact: false }),
+      screen.getByText(`${BRAND.name} 智能体接口密钥`, { exact: false }),
     ).toBeInTheDocument();
   });
 

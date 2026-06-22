@@ -30,8 +30,8 @@ describe("ProviderModelSelect – trigger display", () => {
       />,
     );
     const trigger = screen.getByRole("combobox");
-    expect(trigger).toHaveTextContent(/Ark/);
-    expect(trigger).toHaveTextContent(/seedance/);
+    expect(trigger).toHaveTextContent(/火山方舟/);
+    expect(trigger).toHaveTextContent(/即梦视频/);
   });
 
   it("shows 'follow global default · provider · model' when value is empty and fallbackValue provided", () => {
@@ -47,8 +47,8 @@ describe("ProviderModelSelect – trigger display", () => {
     );
     const trigger = screen.getByRole("combobox");
     expect(trigger).toHaveTextContent(/跟随全局默认/);
-    expect(trigger).toHaveTextContent(/Gemini AI Studio/);
-    expect(trigger).toHaveTextContent(/veo-3\.1-generate-001/);
+    expect(trigger).toHaveTextContent(/谷歌人工智能工作室/);
+    expect(trigger).toHaveTextContent(/谷歌视频 3\.1/);
   });
 
   it("prefers value over fallbackValue when both are provided", () => {
@@ -64,8 +64,8 @@ describe("ProviderModelSelect – trigger display", () => {
     );
     const trigger = screen.getByRole("combobox");
     expect(trigger).not.toHaveTextContent(/跟随全局默认/);
-    expect(trigger).toHaveTextContent(/Ark/);
-    expect(trigger).toHaveTextContent(/seedance/);
+    expect(trigger).toHaveTextContent(/火山方舟/);
+    expect(trigger).toHaveTextContent(/即梦视频/);
   });
 });
 
@@ -127,7 +127,7 @@ describe("ProviderModelSelect – search", () => {
     await user.type(screen.getByPlaceholderText(/搜索模型或供应商/), "veo");
     const visible = screen.getAllByRole("option").map((el) => el.textContent ?? "");
     expect(visible).toHaveLength(2);
-    expect(visible.every((text) => text.includes("veo"))).toBe(true);
+    expect(visible.every((text) => text.includes("谷歌视频"))).toBe(true);
   });
 
   it("matches provider display name and shows all of its models", async () => {
@@ -144,9 +144,9 @@ describe("ProviderModelSelect – search", () => {
     await user.type(screen.getByPlaceholderText(/搜索模型或供应商/), "Gemini");
     const visible = screen.getAllByRole("option").map((el) => el.textContent ?? "");
     expect(visible).toHaveLength(3);
-    expect(visible.some((text) => text.includes("veo-3.1-generate-001"))).toBe(true);
-    expect(visible.some((text) => text.includes("veo-2.0-generate"))).toBe(true);
-    expect(visible.some((text) => text.includes("imagen-4"))).toBe(true);
+    expect(visible.some((text) => text.includes("谷歌视频 3.1"))).toBe(true);
+    expect(visible.some((text) => text.includes("谷歌视频 2.0"))).toBe(true);
+    expect(visible.some((text) => text.includes("谷歌图像 4"))).toBe(true);
   });
 
   it("matches case-insensitively", async () => {
@@ -163,7 +163,7 @@ describe("ProviderModelSelect – search", () => {
     await user.type(screen.getByPlaceholderText(/搜索模型或供应商/), "OPENAI");
     const visible = screen.getAllByRole("option").map((el) => el.textContent ?? "");
     expect(visible).toHaveLength(1);
-    expect(visible[0]).toContain("sora");
+    expect(visible[0]).toContain("开放人工智能视频生成");
   });
 
   it("shows empty state when nothing matches", async () => {

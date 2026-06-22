@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import shutil
+import threading
 import unicodedata
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
@@ -212,6 +213,17 @@ class ProjectManager:
 
         self.projects_root = Path(projects_root)
         self.projects_root.mkdir(parents=True, exist_ok=True)
+        self._local_lock_guard = threading.Lock()
+        self._local_locks: dict[Path, threading.Lock] = {}
+
+    def _local_lock_for(self, lock_path: Path) -> threading.Lock:
+        key = lock_path.resolve(strict=False)
+        with self._local_lock_guard:
+            lock = self._local_locks.get(key)
+            if lock is None:
+                lock = threading.Lock()
+                self._local_locks[key] = lock
+            return lock
 
     def list_projects(self) -> list[str]:
         """列出所有项目"""
@@ -843,8 +855,7 @@ class ProjectManager:
         if not real.exists():
             raise FileNotFoundError(f"剧本文件不存在: {real}")
 
-        with open(real, encoding="utf-8") as f:  # noqa: PTH123
-            return json.load(f)
+        return load_json(real)
 
     def list_scripts(self, project_name: str) -> list[str]:
         """列出项目中的所有剧本"""
@@ -1385,8 +1396,9 @@ class ProjectManager:
         project_file = self._get_project_file_path(project_name)
         lock_path = project_file.parent / f".{project_file.name}.lock"
         lock_path.touch(exist_ok=True)
-        with portalocker.Lock(lock_path, flags=portalocker.LOCK_EX):
-            yield
+        with self._local_lock_for(lock_path):
+            with portalocker.Lock(lock_path, flags=portalocker.LOCK_EX):
+                yield
 
     @contextmanager
     def _script_lock(self, project_name: str, script_filename: str):
@@ -1408,8 +1420,9 @@ class ProjectManager:
         lock_path = real.parent / f".{real.name}.lock"
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         lock_path.touch(exist_ok=True)
-        with portalocker.Lock(lock_path, flags=portalocker.LOCK_EX):
-            yield
+        with self._local_lock_for(lock_path):
+            with portalocker.Lock(lock_path, flags=portalocker.LOCK_EX):
+                yield
 
     def save_project(self, project_name: str, project: dict) -> Path:
         """

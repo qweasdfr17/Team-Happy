@@ -3,8 +3,9 @@
 import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
-from fastapi import File, Form, HTTPException, UploadFile
+from fastapi import Body, File, Form, HTTPException, UploadFile
 
 from lib.app_data_dir import app_data_dir
 from lib.i18n import Translator
@@ -410,7 +411,7 @@ async def add_variant(
     entry_name: str,
     _user: CurrentUser,
     _t: Translator,
-    variant: dict = None,
+    variant: dict[str, Any] | None = Body(default=None),
 ):
     """为项目角色添加变体（少年/成年/战损装等）。"""
     try:
@@ -481,7 +482,7 @@ async def update_variant(
     variant_id: str,
     _user: CurrentUser,
     _t: Translator,
-    body: dict = None,
+    body: dict[str, Any] | None = Body(default=None),
 ):
     """编辑角色变体的 label / description / costume_reference_ids。（JSON body）"""
     try:

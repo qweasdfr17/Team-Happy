@@ -42,7 +42,7 @@ def main():
     write_import_candidates(candidates, output_path)
 
     # 统计
-    print(f"\n导入统计:")
+    print("\n导入统计:")
     print(f"  扫描 TXT 总数: {stats['total']}")
     print(f"  生成候选数:   {stats['candidates']}")
     print(f"  空文件跳过:   {stats['empty_skipped']}")
@@ -53,7 +53,7 @@ def main():
     for c in candidates:
         for t in c["tags"]:
             tag_counts[t] = tag_counts.get(t, 0) + 1
-    print(f"\n标签分布:")
+    print("\n标签分布:")
     for tag, count in sorted(tag_counts.items(), key=lambda x: -x[1]):
         print(f"  {tag}: {count}")
 

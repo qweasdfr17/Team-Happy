@@ -15,10 +15,10 @@
 
 | 用户说 | → Skill | 说明 |
 |------|------|------|
-| "改剧本 / 压缩剧本 / 调整剧本" | **rewrite-script** | preserve 模式禁止触发 |
-| "改成分镜 / 短剧分镜 / 可出片脚本 / 先大纲再分镜" | **short-drama-storyboard** | 两步走，proposals/ 输出 |
+| "改剧本 / 压缩剧本 / 调整剧本" | **rewrite-script** | 使用用户自定义短视频改编逻辑；preserve 模式不覆盖正式剧本 |
+| "改成分镜 / 短剧分镜 / 可出片脚本 / 先大纲再分镜" | **short-drama-storyboard** | 使用用户自定义两步走；已确认剧本只拆分不改写 |
 | 系统内部正式拆 shots | **script-to-shots** | 从 episode script 拆镜头 |
-| "写提示词 / 视频提示词 / 运镜 / 电影感" | **premium-video-prompt** | 精品 9 段式提示词 |
+| "写提示词 / 视频提示词 / 运镜 / 电影感" | **premium-video-prompt** | 使用用户自定义提示词模板方法论，并保留 ArcReel 资产引用与写回规则 |
 
 ## ⚠️ 禁止自动生成视频
 
@@ -26,6 +26,13 @@
 - Agent 不得把"生成提示词"理解成"生成视频"。
 - reference_video 流程：先写 prompt 到 unit 红框（`patch_reference_video_unit_prompt`），用户审核后再由用户点击 UI 或明确确认生成。
 - `generate_video_*` 缺省 `confirmed=false` → 返回确认提示，不入队。
+
+## ⚠️ 出错即停
+
+- 任意工具调用、子任务、文件读写、模型调用或流程步骤返回错误/失败/缺失前置文件时，必须立刻停止当前流程。
+- 不得在错误未解决时继续执行用户原本的下一步要求，不得自行绕过、重试到其他高成本步骤或生成后续产物。
+- 必须先用中文向用户汇报：哪一步出错、原始错误信息/缺失文件、当前已完成到哪里、下一步建议怎么修。
+- 只有用户明确确认继续、重试或改方案后，才允许继续执行后续步骤。
 
 ---
 
@@ -53,6 +60,7 @@
 - **业务入队 / 文本生成 / 能力查询**：统一走 `mcp__arcreel__*` 系列 SDK in-process MCP tool（角色/场景/道具/分镜/视频/宫格/集脚本/规范化剧本/视频能力查询）。它们跑在 server 主进程，不受 sandbox 网络白名单约束，agent 直接以 tool 形式调用。
 - **编辑项目 JSON**：修改剧本（`scripts/*.json`）或角色/场景/道具（`project.json`）**一律走 `mcp__arcreel__*` 编辑工具**——剧本改字段用 `patch_episode_script`，改分集标题用 `patch_episode_meta`，增/删/拆分镜用 `insert_segment` / `remove_segment` / `split_segment`，角色/场景/道具用 `patch_project`。**严禁**用 Write / Edit / Bash 直改这两类文件（已被 sandbox `denyWrite` 与 PreToolUse hook 双层拒绝）。**改 prompt 必重生**：用 `patch_episode_script` 改了某分镜的 `image_prompt` / `video_prompt` 后，工具不会自动作废旧图/视频，必须紧接着调对应生成工具重新生成该分镜，否则会留下「新 prompt + 旧画面」的陈旧。
 - **Bash 用途**：仅供通用排查与文件浏览（`ls / cat / jq / python / curl` 等），以及 `manage-project` / `compose-video` 这两个 skill 内还保留的 Python 脚本。
+- **禁止 Bash 创建/删除项目文件**：不得调用 `mkdir` / `rm` / `del` / `copy` / `move` 等 Bash 命令创建、删除或搬运 `drafts/`、`source/`、`scripts/`、`assets/` 下的项目文件。遇到缺目录、缺 `step1_reference_units.md`、缺剧本文件时，按"出错即停"规则向用户汇报，不得自行用 Bash 补目录后继续。
 - **敏感文件保护**：`.env` / `vertex_keys/` / `.system_config.json*` / `.arcreel.db*` / `.claude/settings.json` 由 sandbox profile（`filesystem.denyRead`）内核级拒绝读取，并由 PreToolUse 文件访问 hook 双重防御；代码文件（.py/.js/.ts/.tsx/.sh/.yaml/.yml/.toml）受运行时 hook 阻止写入。
 
 ### 路径规范

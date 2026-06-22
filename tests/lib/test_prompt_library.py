@@ -7,10 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from lib.prompt_library.loader import load_builtins, load_custom, load_prompt_library, template_list
+from lib.prompt_library.loader import load_builtins, load_prompt_library, template_list
 from lib.prompt_library.models import PromptTemplate
 from lib.prompt_library.resolver import resolve_prompts
-
 
 # ── helpers ───────────────────────────────────────────────────────────────
 

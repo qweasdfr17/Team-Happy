@@ -43,8 +43,8 @@ export function ProjectFlowMap() {
       ...n.data,
       label: (
         <div>
-          <div style={{ fontWeight: 600 }}>{(n.data as Record<string, unknown>).label as string || ""}</div>
-          {((n.data as Record<string, unknown>).sub as string) && <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{(n.data as Record<string, unknown>).sub as string}</div>}
+          <div style={{ fontWeight: 600 }}>{(n.data).label as string || ""}</div>
+          {((n.data).sub as string) && <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{(n.data).sub as string}</div>}
         </div>
       ),
     },
@@ -53,7 +53,7 @@ export function ProjectFlowMap() {
   const [selectedDetail, setSelectedDetail] = useState<FlowNodeDetail | null>(null);
 
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    const detail = (node.data as Record<string, unknown>).detail as FlowNodeDetail | undefined;
+    const detail = (node.data).detail as FlowNodeDetail | undefined;
     setSelectedDetail(detail || null);
   }, []);
 

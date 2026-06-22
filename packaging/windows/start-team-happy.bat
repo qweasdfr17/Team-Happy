@@ -10,7 +10,7 @@ rem ============================================================
 cd /d "%~dp0"
 for %%I in ("%~dp0.") do set "ROOT=%%~fI"
 
-if not defined LISTEN_PORT set "LISTEN_PORT=1241"
+if not defined LISTEN_PORT set "LISTEN_PORT=1242"
 if not defined LISTEN_HOST set "LISTEN_HOST=127.0.0.1"
 if not defined TEAM_HAPPY_URL set "TEAM_HAPPY_URL=http://127.0.0.1:%LISTEN_PORT%"
 if /I "%TEAM_HAPPY_LAN_MODE%"=="true" (
@@ -47,11 +47,11 @@ set "UV_CMD=uv"
 where uv >nul 2>&1
 if errorlevel 1 (
     set "PYTHON_CMD="
-    py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)" >nul 2>&1
+    py -3 -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)" >nul 2>&1
     if not errorlevel 1 set "PYTHON_CMD=py -3"
 
     if not defined PYTHON_CMD (
-        python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)" >nul 2>&1
+        python -c "import sys; raise SystemExit(0 if sys.version_info >= (3, 12) else 1)" >nul 2>&1
         if not errorlevel 1 set "PYTHON_CMD=python"
     )
 
@@ -122,6 +122,23 @@ echo uv command: %UV_CMD% >> "%START_LOG%"
 %UV_CMD% --version
 %UV_CMD% --version >> "%START_LOG%" 2>&1
 
+set "FFMPEG_WARNING="
+where ffmpeg >nul 2>&1
+if errorlevel 1 set "FFMPEG_WARNING=ffmpeg"
+where ffprobe >nul 2>&1
+if errorlevel 1 (
+    if defined FFMPEG_WARNING (
+        set "FFMPEG_WARNING=%FFMPEG_WARNING%/ffprobe"
+    ) else (
+        set "FFMPEG_WARNING=ffprobe"
+    )
+)
+if defined FFMPEG_WARNING (
+    echo [WARN] Optional %FFMPEG_WARNING% not found in PATH.
+    echo [WARN] Video thumbnail extraction may be skipped. Core generation can still run.
+    echo Optional %FFMPEG_WARNING% not found in PATH. >> "%START_LOG%"
+)
+
 if not exist "%ROOT%\frontend\dist\index.html" (
     echo [ERROR] Missing frontend\dist\index.html.
     echo This portable package is incomplete. Please rebuild the package.
@@ -176,7 +193,7 @@ echo.
 echo Starting uvicorn... >> "%START_LOG%"
 start "" powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "$url=$env:TEAM_HAPPY_URL; $port=[int]$env:LISTEN_PORT; for($i=0; $i -lt 90; $i++){ try { $c=New-Object Net.Sockets.TcpClient('127.0.0.1',$port); $c.Close(); Start-Process $url; exit 0 } catch { Start-Sleep -Seconds 1 } }; Start-Process $url"
 
-%UV_CMD% --directory "%ROOT%" run uvicorn server.app:app --host %LISTEN_HOST% --port %LISTEN_PORT%
+%UV_CMD% --directory "%ROOT%" run --no-sync uvicorn server.app:app --host %LISTEN_HOST% --port %LISTEN_PORT%
 
 echo.
 echo Team-Happy has stopped.

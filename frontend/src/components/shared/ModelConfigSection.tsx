@@ -7,6 +7,7 @@ import { ResolutionPicker } from "./ResolutionPicker";
 import { ImageModelDualSelect } from "./ImageModelDualSelect";
 import { useEndpointCatalogStore } from "@/stores/endpoint-catalog-store";
 import { CARD_STYLE } from "@/components/ui/darkroom-tokens";
+import { formatBackendDisplay } from "@/utils/model-display";
 import type { ProviderInfo } from "@/types/provider";
 import type { CustomProviderInfo } from "@/types/custom-provider";
 
@@ -162,7 +163,7 @@ export function ModelConfigSection({
       <p className="text-[12.5px] leading-[1.55] text-text-3">{t("default_hint")}</p>
 
       {showVideo && (
-        <ChannelCard kicker="Video Channel" title={t("model_video")}>
+        <ChannelCard kicker={t("dashboard:video_channel_kicker")} title={t("model_video")}>
           <ProviderModelSelect
             value={value.videoBackend}
             options={options.videoBackends}
@@ -172,7 +173,7 @@ export function ModelConfigSection({
             defaultLabel={t("use_global_default")}
             defaultHint={
               globalDefaults.video
-                ? t("current_global_default", { value: globalDefaults.video })
+                ? t("current_global_default", { value: formatBackendDisplay(globalDefaults.video, options.providerNames) })
                 : undefined
             }
             fallbackValue={globalDefaults.video || undefined}
@@ -243,7 +244,7 @@ export function ModelConfigSection({
       )}
 
       {showImage && (
-        <ChannelCard kicker="Image Channel" title={t("model_image")}>
+        <ChannelCard kicker={t("dashboard:image_channel_kicker")} title={t("model_image")}>
           <ImageModelDualSelect
             valueT2I={value.imageBackendT2I}
             valueI2I={value.imageBackendI2I}
@@ -274,7 +275,7 @@ export function ModelConfigSection({
       )}
 
       {showText && (
-        <ChannelCard kicker="Text Channel" title={t("model_text_script")}>
+        <ChannelCard kicker={t("dashboard:text_channel_kicker")} title={t("model_text_script")}>
           <div className="space-y-3.5">
             {/* Script */}
             <div>
@@ -290,7 +291,7 @@ export function ModelConfigSection({
                 defaultLabel={t("use_global_default")}
                 defaultHint={
                   globalDefaults.textScript
-                    ? t("current_global_default", { value: globalDefaults.textScript })
+                    ? t("current_global_default", { value: formatBackendDisplay(globalDefaults.textScript, options.providerNames) })
                     : undefined
                 }
                 fallbackValue={globalDefaults.textScript || undefined}
@@ -312,7 +313,7 @@ export function ModelConfigSection({
                 defaultLabel={t("use_global_default")}
                 defaultHint={
                   globalDefaults.textOverview
-                    ? t("current_global_default", { value: globalDefaults.textOverview })
+                    ? t("current_global_default", { value: formatBackendDisplay(globalDefaults.textOverview, options.providerNames) })
                     : undefined
                 }
                 fallbackValue={globalDefaults.textOverview || undefined}
@@ -334,7 +335,7 @@ export function ModelConfigSection({
                 defaultLabel={t("use_global_default")}
                 defaultHint={
                   globalDefaults.textStyle
-                    ? t("current_global_default", { value: globalDefaults.textStyle })
+                    ? t("current_global_default", { value: formatBackendDisplay(globalDefaults.textStyle, options.providerNames) })
                     : undefined
                 }
                 fallbackValue={globalDefaults.textStyle || undefined}

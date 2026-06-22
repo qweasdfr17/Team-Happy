@@ -1096,7 +1096,8 @@ class TestExportEpisodeDraft:
                     "episodes": [{"episode": 1, "title": "第一集", "script_file": "scripts/episode_1.json"}],
                 },
                 ensure_ascii=False,
-            )
+            ),
+            encoding="utf-8",
         )
 
         scripts_dir = project_dir / "scripts"
@@ -1115,7 +1116,8 @@ class TestExportEpisodeDraft:
                     ],
                 },
                 ensure_ascii=False,
-            )
+            ),
+            encoding="utf-8",
         )
 
         svc = JianyingDraftService(pm)

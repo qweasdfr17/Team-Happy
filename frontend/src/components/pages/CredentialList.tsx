@@ -26,7 +26,7 @@ import { FieldLabel } from "@/components/ui/FieldLabel";
 import type { CredentialSecretField, ProviderCredential, ProviderTestResult } from "@/types";
 
 // 单 secret provider 的默认凭证字段，供未显式传 secretFields 的调用方兜底（行为同旧版 api_key 表单）。
-const DEFAULT_SECRET_FIELDS: CredentialSecretField[] = [{ key: "api_key", label: "API Key" }];
+const DEFAULT_SECRET_FIELDS: CredentialSecretField[] = [{ key: "api_key", label: "接口密钥" }];
 
 // 已知 secret 凭证字段 → 前端 i18n label key；未知 key 回退后端提供的 label。
 const SECRET_FIELD_LABEL_KEY: Record<string, string> = {

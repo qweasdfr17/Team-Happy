@@ -7,7 +7,6 @@ Agent 可通过这些受控工具管理角色变体（时期/服装/装束），
 from __future__ import annotations
 
 import hashlib
-import re
 from typing import Any
 
 from claude_agent_sdk import tool

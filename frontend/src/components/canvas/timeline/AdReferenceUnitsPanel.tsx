@@ -83,10 +83,20 @@ export function AdReferenceUnitsPanel({ projectName, episode, shots }: AdReferen
 
   // units 加载完后自动拉预检
   useEffect(() => {
-    if (units !== null) {
-      void fetchPreflight();
-    }
-  }, [units, fetchPreflight]);
+    if (units === null) return;
+
+    let cancelled = false;
+    API.getPreflightReport(projectName, episode)
+      .then((report) => {
+        if (!cancelled) setPreflight(report);
+      })
+      .catch(() => {
+        if (!cancelled) setPreflight(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [units, projectName, episode]);
 
   const [contextPack, setContextPack] = useState<ContextPack | null>(null);
   const [ctxPackLoading, setCtxPackLoading] = useState(false);

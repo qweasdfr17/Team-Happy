@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Repository Maintenance
+
+* 补强 GitHub 上传前的忽略规则，避免提交本地环境、依赖缓存、日志、生成产物和用户项目数据。
+* 清理 tldraw 画布实验集成残留，后续无限画布方案改为独立阶段重新设计。
+* 补充 README 本地源码运行步骤、上传前注意事项和依赖安装说明。
+* 前端测试环境 `jsdom` 收敛到 26.x，避开 npm 11 解析 `jsdom@29` 间接依赖时的安装错误；保留 pnpm 作为推荐包管理器。
+* 新增无限画布后续接入方案文档：`docs/proposals/infinite-canvas-integration-plan.md`。
+
 ## [0.18.0](https://github.com/ArcReel/ArcReel/compare/v0.17.0...v0.18.0) (2026-06-15)
 
 

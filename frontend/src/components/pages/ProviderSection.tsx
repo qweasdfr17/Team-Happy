@@ -11,6 +11,7 @@ import { ProviderDetail } from "./ProviderDetail";
 import { CustomProviderSection } from "./settings/CustomProviderSection";
 import { CustomProviderDetail } from "./settings/CustomProviderDetail";
 import { CustomProviderForm } from "./settings/CustomProviderForm";
+import { localizeProviderName } from "@/utils/model-display";
 
 // ---------------------------------------------------------------------------
 // Status dot — Darkroom palette
@@ -211,7 +212,7 @@ export function ProviderSection() {
                 }}
               />
               <ProviderIcon providerId={p.id} className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">{p.display_name}</span>
+              <span className="min-w-0 flex-1 truncate">{localizeProviderName(p.id, p.display_name)}</span>
               <StatusDot status={p.status} />
             </button>
           );

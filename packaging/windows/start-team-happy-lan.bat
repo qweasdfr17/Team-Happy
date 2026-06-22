@@ -9,7 +9,7 @@ rem ============================================================
 
 cd /d "%~dp0"
 
-if not defined LISTEN_PORT set "LISTEN_PORT=1241"
+if not defined LISTEN_PORT set "LISTEN_PORT=1242"
 set "LISTEN_HOST=0.0.0.0"
 set "AUTH_ENABLED=true"
 set "AUTH_USERNAME=admin"

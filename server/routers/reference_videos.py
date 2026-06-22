@@ -20,9 +20,9 @@ from lib.asset_types import BUCKET_KEY
 from lib.generation_queue import get_generation_queue
 from lib.generation_queue_client import TaskSpec, TaskSpecValidationError
 from lib.i18n import Translator
+from lib.preflight import run_preflight
 from lib.project_change_hints import project_change_source
 from lib.project_manager import EpisodeScriptReboundError, ProjectManager, effective_mode
-from lib.preflight import run_preflight
 from lib.reference_video import assemble_shots_text, parse_prompt
 from lib.reference_video.ad_units import (
     ad_unit_prompt_override,
@@ -30,6 +30,8 @@ from lib.reference_video.ad_units import (
     resolve_ad_unit_shots,
     sync_ad_reference_units,
 )
+from lib.reference_video.duration_guard import normalize_reference_video_script
+from lib.reference_video.prompt_text_cleaner import clean_shot_texts
 from lib.resource_paths import resource_relative_path
 from lib.script_editor import ScriptEditError
 from lib.version_manager import VersionManager
@@ -202,10 +204,12 @@ def _build_unit_dict(
     shots, _names, override = parse_prompt(prompt)
     if override and duration_override is not None:
         shots[0].duration = max(1, int(duration_override))
+    shot_dicts = [s.model_dump() for s in shots]
+    clean_shot_texts(shot_dicts)
     duration_total = sum(s.duration for s in shots)
     return {
         "unit_id": unit_id,
-        "shots": [s.model_dump() for s in shots],
+        "shots": shot_dicts,
         "references": references,
         "duration_seconds": duration_total,
         "duration_override": override,
@@ -294,13 +298,16 @@ async def add_unit(
     _t: Translator,
 ) -> dict[str, Any]:
     refs = [r.model_dump() for r in req.references]
+    project, _existing_script, _script_file = _load_episode_script(project_name, episode, _t)
+    max_unit_duration = await resolve_max_unit_duration(project)
 
     with _locked_episode_script(
         project_name, _episode_script_resolver(episode, _t, refs, require_ad=False), _t
     ) as script:
         # unit_id 在锁内基于 fresh script 计算，避免并发新增撞 ID
+        unit_id = _next_unit_id(script, episode)
         unit = _build_unit_dict(
-            unit_id=_next_unit_id(script, episode),
+            unit_id=unit_id,
             prompt=req.prompt,
             references=refs,
             duration_override=req.duration_seconds,
@@ -308,6 +315,13 @@ async def add_unit(
             note=req.note,
         )
         script.setdefault("video_units", []).append(unit)
+        units = normalize_reference_video_script(
+            script,
+            episode=episode,
+            project=project,
+            max_duration=max_unit_duration,
+        )
+        unit = next((u for u in units if u.get("unit_id") == unit_id), units[-1] if units else unit)
     return {"unit": unit}
 
 
@@ -354,6 +368,8 @@ async def patch_unit(
 ) -> dict[str, Any]:
     # references 存在性校验在解析器内、项目锁内进行，失败 raise 400
     refs: list[dict] | None = [r.model_dump() for r in req.references] if req.references is not None else None
+    project, _existing_script, _script_file = _load_episode_script(project_name, episode, _t)
+    max_unit_duration = await resolve_max_unit_duration(project)
 
     with _locked_episode_script(
         project_name, _episode_script_resolver(episode, _t, refs, require_ad=False), _t
@@ -368,6 +384,7 @@ async def patch_unit(
             if override and req.duration_seconds is not None:
                 shots[0].duration = max(1, int(req.duration_seconds))
             unit["shots"] = [s.model_dump() for s in shots]
+            clean_shot_texts(unit["shots"])
             unit["duration_seconds"] = sum(s.duration for s in shots)
             unit["duration_override"] = override
         elif req.duration_seconds is not None and unit.get("duration_override"):
@@ -379,6 +396,14 @@ async def patch_unit(
             unit["transition_to_next"] = req.transition_to_next
         if req.note is not None:
             unit["note"] = req.note
+
+        units = normalize_reference_video_script(
+            script,
+            episode=episode,
+            project=project,
+            max_duration=max_unit_duration,
+        )
+        unit = next((u for u in units if u.get("unit_id") == unit_id), unit)
 
     return {"unit": unit}
 

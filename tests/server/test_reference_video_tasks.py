@@ -16,6 +16,10 @@ from server.services.reference_video_tasks import (
 )
 
 
+def _task_payload(**extra) -> dict:
+    return {"script_file": "scripts/episode_1.json", "video_prompt_source": "skill", **extra}
+
+
 def _load_project_and_unit(proj_dir: Path, unit_id: str) -> tuple[dict, dict]:
     project = json.loads((proj_dir / "project.json").read_text(encoding="utf-8"))
     script = json.loads((proj_dir / "scripts" / "episode_1.json").read_text(encoding="utf-8"))
@@ -52,6 +56,7 @@ def _write_project(tmp_path: Path) -> Path:
                 ],
                 "duration_seconds": 3,
                 "duration_override": False,
+                "video_prompt_source": "skill",
                 "transition_to_next": "cut",
                 "note": None,
                 "generated_assets": {
@@ -159,40 +164,25 @@ def test_render_unit_prompt_replaces_mentions_in_order():
     assert "Shot 2 (5s):" in rendered
 
 
-def test_render_unit_prompt_appends_reference_legend_without_mentions():
-    """精品提示词正文不写 @ 时，backend prompt 仍追加 [图N] 对照表。"""
-    unit = {
-        "shots": [
-            {
-                "duration": 14,
-                "text": (
-                    "【图片引用声明】\n"
-                    "图片1：张三\n"
-                    "图片2：酒馆\n\n"
-                    "【切片段1】\n"
-                    "画面：张三站在酒馆门口"
-                ),
-            }
-        ],
-        "references": [
-            {"type": "character", "name": "张三"},
-            {"type": "scene", "name": "酒馆"},
-        ],
-    }
-    rendered = _render_unit_prompt(unit)
-    assert "图片1：张三" in rendered
-    assert "[图1] 角色「张三」设计图" in rendered
-    assert "[图2] 场景「酒馆」设计图" in rendered
-    assert "@张三" not in rendered
-
-
-def test_merge_inferred_references_keeps_existing_unmentioned_refs():
-    inferred = [{"type": "character", "name": "张三"}]
-    existing = [{"type": "character", "name": "张三"}, {"type": "scene", "name": "酒馆"}]
-    assert _merge_inferred_references(inferred, existing) == [
+def test_merge_inferred_references_prefers_prompt_order_and_keeps_unmentioned_refs():
+    inferred = [{"type": "scene", "name": "酒馆"}, {"type": "character", "name": "张三"}]
+    declared = [
         {"type": "character", "name": "张三"},
         {"type": "scene", "name": "酒馆"},
+        {"type": "prop", "name": "酒杯"},
     ]
+
+    assert _merge_inferred_references(inferred, declared) == [
+        {"type": "scene", "name": "酒馆"},
+        {"type": "character", "name": "张三"},
+        {"type": "prop", "name": "酒杯"},
+    ]
+
+
+def test_merge_inferred_references_falls_back_to_declared_refs_when_prompt_has_none():
+    declared = [{"type": "character", "name": "张三"}]
+
+    assert _merge_inferred_references([], declared) == declared
 
 
 def test_apply_provider_constraints_veo_clamps_duration_and_refs():
@@ -326,7 +316,7 @@ async def test_execute_reference_video_task_success(tmp_path: Path, monkeypatch:
     result = await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
     assert result["resource_type"] == "reference_videos"
@@ -396,7 +386,7 @@ async def test_execute_reference_video_task_clears_stale_video_uri_and_thumbnail
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -460,7 +450,7 @@ async def test_execute_reference_video_task_grok_uses_provider_default_resolutio
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -524,7 +514,7 @@ async def test_execute_reference_video_task_respects_project_model_settings_reso
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -551,7 +541,7 @@ async def test_execute_reference_video_task_missing_reference_fails(tmp_path: Pa
         await rvt.execute_reference_video_task(
             "demo",
             "E1U1",
-            {"script_file": "scripts/episode_1.json"},
+            _task_payload(),
             user_id="u1",
         )
 
@@ -654,7 +644,7 @@ async def test_execute_reference_video_task_uses_real_media_generator(tmp_path: 
     result = await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -722,7 +712,7 @@ async def test_execute_reference_video_task_passes_source_refs(tmp_path: Path, m
     result = await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
     # 单次调用：R2V 层不再做二次压缩重试
@@ -816,7 +806,7 @@ async def test_execute_reference_video_task_clamps_via_resolver(
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -917,7 +907,7 @@ async def test_execute_reference_video_task_prompt_matches_clipped_refs(
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -999,7 +989,7 @@ async def test_gemini_model_settings_read_via_composite_key(
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -1083,7 +1073,7 @@ async def test_execute_reference_video_task_skips_clamp_when_backend_model_diver
     await rvt.execute_reference_video_task(
         "demo",
         "E1U1",
-        {"script_file": "scripts/episode_1.json"},
+        _task_payload(),
         user_id="u1",
     )
 
@@ -1159,7 +1149,7 @@ async def test_execute_reference_video_task_rejects_unsupported_duration(
         await rvt.execute_reference_video_task(
             "demo",
             "E1U1",
-            {"script_file": "scripts/episode_1.json"},
+            _task_payload(),
             user_id="u1",
         )
     # 守卫在调用 backend 前拦下：generate_video_async 不应被调用

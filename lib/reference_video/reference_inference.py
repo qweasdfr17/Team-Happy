@@ -8,7 +8,6 @@ prompt 声明错位导致视频模型收到的参考图顺序错误。
 from __future__ import annotations
 
 import re
-from typing import Any
 
 # ── 图号模式 ────────────────────────────────────────────────────────────
 # 匹配: 图1 / 图 1 / 图片1 / 图片 1 / image1 / img1 / [图1] / [图 1]
@@ -76,7 +75,7 @@ def _build_variant_costume_index(project: dict) -> dict[str, tuple[str, str]]:
     return index
 
 
-def infer_references_from_prompt_text(project: dict, prompt: str) -> list[dict]:
+def infer_references_from_prompt_text(project: dict, prompt: object) -> list[dict]:
     """从成品提示词文本推断 reference 绑定列表。
 
     识别模式（按优先级）：
@@ -98,7 +97,7 @@ def infer_references_from_prompt_text(project: dict, prompt: str) -> list[dict]:
 
     # 索引：{name: type}
     name_to_type: dict[str, str] = {}
-    buckets: dict[str, dict] = {
+    buckets: dict[str, object] = {
         "character": project.get("characters") or {},
         "scene": project.get("scenes") or {},
         "prop": project.get("props") or {},

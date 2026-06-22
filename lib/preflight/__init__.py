@@ -3,8 +3,8 @@
 不阻塞生成，只产出结构化的预检报告供前端展示与人工决策。
 """
 
-from lib.preflight.models import PreflightIssue, PreflightReport, Severity
 from lib.preflight.checks import run_preflight
+from lib.preflight.models import PreflightIssue, PreflightReport, Severity
 
 __all__ = [
     "PreflightIssue",

@@ -302,7 +302,7 @@ describe("ModelConfigSection", () => {
         globalDefaults={{ video: "", imageT2I: "", imageI2I: "", textScript: "", textOverview: "", textStyle: "" }}
       />,
     );
-    expect(screen.getByRole("radio", { name: "auto" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "自动" })).toHaveAttribute("aria-checked", "true");
   });
 
   it("marks the selected duration radio as checked", () => {

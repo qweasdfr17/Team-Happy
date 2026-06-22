@@ -118,6 +118,58 @@ docker compose up -d
 
 > 📖 详细步骤请参考 [完整入门教程](docs/getting-started.md)
 
+### 本地源码运行
+
+适合开发、测试和二次修改。建议使用 Python 3.12+、Node.js 20.19+、pnpm 10+。
+
+```bash
+# 1. 克隆仓库
+git clone <your-repo-url>
+cd ArcReel-main
+
+# 2. 后端依赖
+uv sync --dev
+cp .env.example .env
+
+# 3. 前端依赖
+cd frontend
+pnpm install
+cp .env.example .env
+cd ..
+
+# 4. 启动后端
+uv run uvicorn server.app:app --host 127.0.0.1 --port 1242
+
+# 5. 另开终端启动前端
+cd frontend
+pnpm dev -- --host 127.0.0.1 --port 5174
+```
+
+访问 `http://127.0.0.1:5174`。如果使用默认后端 `1242` 端口，请在 `frontend/.env` 中设置：
+
+```env
+VITE_API_PROXY_TARGET=http://127.0.0.1:1242
+```
+
+前端包管理以 `pnpm-lock.yaml` 为准；若只做快速验证，也可以在 `frontend/` 下执行 `npm install` 按 `package.json` 安装依赖，但团队协作和可复现构建建议使用 `pnpm install`。
+
+### GitHub 上传前注意事项
+
+仓库已配置 `.gitignore`，默认不会上传以下本地内容：
+
+- `.env`、`frontend/.env` 等本地密钥配置
+- `.venv/`、`frontend/node_modules/`、`frontend/dist/` 等依赖和构建产物
+- `logs/`、`*.log`、`.pytest_cache/`、`.ruff_cache/` 等运行缓存
+- `projects/` 下的用户项目数据、生成素材、SQLite 数据库和 Agent transcript
+- `vertex_keys/` 下的本地供应商凭证
+
+上传前可执行：
+
+```bash
+git status --short
+git check-ignore -v .env frontend/.env frontend/node_modules projects/<your-project-name>
+```
+
 ## 功能特性
 
 - **完整生产流水线** — 小说 → 剧本 → 角色设计 → 分镜图片 → 视频片段 → 成片，一键编排

@@ -1,11 +1,8 @@
 """episode_planner screenplay 快路径 单元测试。"""
 
-import re
 
-import pytest
 
 from lib.episode_planner import EpisodePlanner
-
 
 # ── marker regex 测试 ──────────────────────────────────────────────────────
 
