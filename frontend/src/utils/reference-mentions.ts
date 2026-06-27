@@ -216,7 +216,7 @@ export function syncPromptReferenceSection(prompt: string, references: Reference
   const lines = prompt.split(/\r?\n/);
   const headerIndex = lines.findIndex((line) => line.includes("【图片引用声明】"));
   if (headerIndex < 0) return prompt;
-  const nextDecls = references.map((ref, index) => `图片${index + 1}：${ref.name}`);
+  const nextDecls = references.map((ref) => `@[${ref.name}]`);
   let end = headerIndex + 1;
   while (end < lines.length) {
     const line = lines[end];

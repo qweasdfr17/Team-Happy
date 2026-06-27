@@ -136,6 +136,185 @@ def _strip_inline_image_refs(text: str) -> str:
     return clean_cn_prompt_spacing(cleaned.strip())
 
 
+def _strip_subtitle_directives(text: str) -> str:
+    """Remove explicit subtitle directives from visual text."""
+    cleaned = re.sub(r"字幕\s*[:：]?\s*[「“\"]?[^。！？；\n「」“”\"]{1,20}[」”\"]?\s*[。；;]?", "", text)
+    return clean_cn_prompt_spacing(cleaned.strip())
+
+
+def _dedupe_nonempty(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        cleaned = clean_cn_prompt_spacing(str(item).strip())
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        result.append(cleaned)
+    return result
+
+
+def _speech_from_value(value: object) -> list[str]:
+    """Normalize dialogue/voiceover values without touching visual prompt text."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        lines: list[str] = []
+        for item in value:
+            lines.extend(_speech_from_value(item))
+        return lines
+    if isinstance(value, dict):
+        speaker = str(value.get("speaker") or value.get("role") or value.get("character") or "").strip()
+        line = str(
+            value.get("line")
+            or value.get("text")
+            or value.get("content")
+            or value.get("dialogue")
+            or value.get("voiceover_text")
+            or ""
+        ).strip()
+        if speaker and line:
+            return [f"{speaker}「{line}」"]
+        if line:
+            return [line]
+    return []
+
+
+def _speech_from_text(text: str, speaker_names: list[str] | None = None) -> list[str]:
+    """Best-effort fallback for legacy drama units that embedded speech in text."""
+    if not isinstance(text, str) or not text.strip():
+        return []
+
+    valid_speakers = [name for name in (speaker_names or []) if name]
+    valid_speaker_set = set(valid_speakers)
+    role_words = (
+        "保安",
+        "职员",
+        "司机",
+        "记者",
+        "主持人",
+        "评审",
+        "代表",
+        "同事",
+        "员工",
+        "老师",
+        "水总",
+        "欧阳总",
+    )
+
+    def pick_last_speaker_name(value: str) -> str:
+        matches = [(value.rfind(name), name) for name in valid_speakers if name in value]
+        matches = [(idx, name) for idx, name in matches if idx >= 0]
+        if not matches:
+            return ""
+        return max(matches, key=lambda item: item[0])[1]
+
+    def infer_plain_speaker(sentence: str) -> str:
+        colon_match = re.search(r"([\u4e00-\u9fffA-Za-z0-9_]{1,12})(?:（[^）]{1,20}）)?\s*[:：]\s*$", sentence)
+        if colon_match:
+            return normalize_plain_speaker(colon_match.group(1).strip())
+
+        speech_match = re.search(
+            r"([\u4e00-\u9fffA-Za-z0-9_]{1,12})"
+            r"(?:轻声|低声|沉声|拔高语气|故作大方)?"
+            r"(?:说|问|喊|叫|答|开口|解释|怒斥|嗤笑)\s*[:：]?\s*$",
+            sentence,
+        )
+        return normalize_plain_speaker(speech_match.group(1).strip()) if speech_match else ""
+
+    def normalize_plain_speaker(candidate: str) -> str:
+        match = re.search(r"([一二三四五六七八九十两几]名保安|保安)$", candidate)
+        if match:
+            return match.group(1)
+        for word in role_words:
+            if candidate.endswith(word):
+                tail = re.search(r"([\u4e00-\u9fffA-Za-z0-9_]{0,4}" + re.escape(word) + r")$", candidate)
+                return tail.group(1) if tail else word
+        return candidate
+
+    def is_plausible_plain_speaker(candidate: str) -> bool:
+        if not candidate:
+            return False
+        if valid_speaker_set and candidate in valid_speaker_set:
+            return True
+        if candidate.startswith(("他", "她", "其")):
+            return False
+        if candidate.endswith(("开口", "低声", "轻声", "沉声", "语气镇定", "故作大方")):
+            return False
+        return any(word in candidate for word in role_words)
+
+    def infer_speaker(quote_start: int) -> str:
+        prefix = text[:quote_start]
+        boundary = max(prefix.rfind(mark) for mark in ("。", "！", "？", "；", "\n"))
+        sentence = prefix[boundary + 1 :]
+
+        plain_speaker = infer_plain_speaker(sentence)
+        if plain_speaker and plain_speaker not in {"字幕", "画面"} and is_plausible_plain_speaker(plain_speaker):
+            return plain_speaker
+
+        named_speaker = pick_last_speaker_name(sentence)
+        if named_speaker:
+            return named_speaker
+
+        mentions = re.findall(r"@\[([^\]]+)\]", sentence)
+        if valid_speaker_set:
+            mentions = [name for name in mentions if name in valid_speaker_set]
+        if mentions:
+            return mentions[-1].strip()
+
+        previous_mentions = re.findall(r"@\[([^\]]+)\]", prefix)
+        if valid_speaker_set:
+            previous_mentions = [name for name in previous_mentions if name in valid_speaker_set]
+        if previous_mentions:
+            return previous_mentions[-1].strip()
+        return ""
+
+    def is_non_dialogue_quote(quote_start: int, spoken: str) -> bool:
+        prefix = text[:quote_start]
+        sentence_start = max(prefix.rfind(mark) for mark in ("。", "！", "？", "；", "\n"))
+        sentence = prefix[sentence_start + 1 :]
+        return "字幕" in sentence[-16:] or spoken in {"十年后"}
+
+    lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        match = re.match(r"^(?:对白|旁白|台词|配音)\s*[:：]\s*(.+)$", line)
+        if match:
+            lines.append(match.group(1).strip())
+
+    # Preserve short quoted dialogue already embedded in the shot description.
+    for match in re.finditer(r"[「“\"](.{1,80}?)[」”\"]", text):
+        speaker = infer_speaker(match.start())
+        spoken = match.group(1).strip()
+        if not spoken or is_non_dialogue_quote(match.start(), spoken):
+            continue
+        lines.append(f"{speaker}「{spoken}」" if speaker else f"「{spoken}」")
+
+    return _dedupe_nonempty(lines)
+
+
+def _resolve_shot_speech(shot: dict, raw_text: str, speaker_names: list[str] | None = None) -> str:
+    """Resolve dialogue/voiceover from known fields, falling back to legacy text."""
+    values: list[str] = []
+    for key in ("voiceover_text", "dialogue_text", "dialogue", "voiceover", "narration"):
+        values.extend(_speech_from_value(shot.get(key)))
+
+    video_prompt = shot.get("video_prompt")
+    if isinstance(video_prompt, dict):
+        for key in ("voiceover_text", "dialogue_text", "dialogue", "voiceover", "narration"):
+            values.extend(_speech_from_value(video_prompt.get(key)))
+
+    if not values:
+        values.extend(_speech_from_text(raw_text, speaker_names))
+
+    cleaned = [_strip_inline_image_refs(item) for item in values]
+    return "；".join(_dedupe_nonempty(cleaned))
+
+
 def _compress_blank_lines(text: str) -> str:
     """压缩连续 3+ 个换行为最多两个（段落间最多一个空行）。
 
@@ -181,9 +360,9 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
 
     # ── 图片引用声明 ──
     img_lines: list[str] = []
-    for i, (name, _sheet) in enumerate(characters + scenes + props, 1):
-        img_lines.append(f"图片{i}：{name}")
-    img_section = "\n".join(img_lines) if img_lines else "图片1：（无资产）"
+    for name, _sheet in characters + scenes + props:
+        img_lines.append(f"@[{name}]")
+    img_section = "\n".join(img_lines) if img_lines else "（无资产）"
 
     # ── 比例：从 project 读取，调用方显式传入优先 ──
     resolved_ratio = aspect_ratio.strip() if aspect_ratio else ""
@@ -225,10 +404,9 @@ def render_unit_prompt_premium(unit: dict, project: dict, *, style: str = "", as
         sidx = si + 1
         raw_text = shot.get("text", "") or shot.get("video_prompt", "") or ""
         # 清理行内图片编号引用，只保留资产名
-        text = _strip_inline_image_refs(raw_text) if raw_text else ""
+        text = _strip_subtitle_directives(_strip_inline_image_refs(raw_text)) if raw_text else ""
         duration = shot.get("duration", 5)
-        voiceover_raw = shot.get("voiceover_text", "")
-        voiceover = _strip_inline_image_refs(voiceover_raw) if voiceover_raw else ""
+        voiceover = _resolve_shot_speech(shot, raw_text, [name for name, _sheet in characters])
 
         slice_sections.append(
             f"【切片段{sidx}】\n"
@@ -303,6 +481,12 @@ def apply_premium_prompt_to_unit(unit: dict, project: dict) -> dict:
     Returns:
         修改后的 unit（原地修改 + 返回）
     """
+    if not any(
+        isinstance(s, dict) and str(s.get("text") or s.get("video_prompt") or "").strip()
+        for s in (unit.get("shots") or [])
+    ):
+        raise ValueError(f"unit {unit.get('unit_id') or '?'} 缺少画面内容，拒绝生成空提示词")
+
     # 记录原始总时长（_add_metadata 已写入）
     total_duration: int = int(unit.get("duration_seconds", 0))
     if total_duration <= 0:

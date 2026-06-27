@@ -171,13 +171,13 @@ describe("prompt/reference synchronization helpers", () => {
         { type: "character", name: "主角" },
         { type: "scene", name: "酒馆" },
       ]),
-    ).toBe("【图片引用声明】\n图片1：主角\n图片2：酒馆\n\n【画面内容】\n[图1] 内");
+    ).toBe("【图片引用声明】\n@[主角]\n@[酒馆]\n\n【画面内容】\n[图1] 内");
   });
 
   it("does not consume the next section when the declaration block is empty", () => {
     const prompt = "【图片引用声明】\n【画面内容】\n主角推门";
     expect(syncPromptReferenceSection(prompt, [{ type: "character", name: "主角" }])).toBe(
-      "【图片引用声明】\n图片1：主角\n【画面内容】\n主角推门",
+      "【图片引用声明】\n@[主角]\n【画面内容】\n主角推门",
     );
   });
 

@@ -106,16 +106,16 @@ class TestApplyPremiumPrompt:
         # 改为测试：如果 project 中没有匹配资产，旧 refs 保留
         unit["references"] = [{"type": "character", "name": "萧近宸"}]
         apply_premium_prompt_to_unit(unit, _project())
-        # 推断应该成功（prompt 中包含"图片1：萧近宸"）
+        # 推断应该成功（prompt 中包含 "@[萧近宸]"）
         assert len(unit["references"]) >= 1
 
-    def test_image_declarations_in_prompt(self):
+    def test_reference_mentions_in_prompt(self):
         unit = _multi_shot_unit()
         apply_premium_prompt_to_unit(unit, _project())
         text = unit["shots"][0]["text"]
-        assert "图片1：萧近宸" in text
-        assert "图片2：王府书房" in text
-        assert "图片3：话本" in text
+        assert "@[萧近宸]" in text
+        assert "@[王府书房]" in text
+        assert "@[话本]" in text
 
     def test_slice_sections_preserve_original_shots(self):
         unit = _multi_shot_unit()
@@ -162,9 +162,9 @@ class TestRenderPremiumPrompt:
     def test_image_order_matches_references(self):
         prompt = render_unit_prompt_premium(_multi_shot_unit(), _project())
         # 图片顺序：角色→场景→道具
-        idx_xiao = prompt.index("图片1：萧近宸")
-        idx_study = prompt.index("图片2：王府书房")
-        idx_book = prompt.index("图片3：话本")
+        idx_xiao = prompt.index("@[萧近宸]")
+        idx_study = prompt.index("@[王府书房]")
+        idx_book = prompt.index("@[话本]")
         assert idx_xiao < idx_study < idx_book
 
 
@@ -250,9 +250,9 @@ class TestStyleFromProject:
         project["aspect_ratio"] = "21:9"
         project["style"] = "黑白默片"
         prompt = render_unit_prompt_premium(_multi_shot_unit(), project)
-        assert "图片1：萧近宸" in prompt
-        assert "图片2：王府书房" in prompt
-        assert "图片3：话本" in prompt
+        assert "@[萧近宸]" in prompt
+        assert "@[王府书房]" in prompt
+        assert "@[话本]" in prompt
 
 
 class TestStripInlineImageRefs:
@@ -316,9 +316,9 @@ class TestNoInlineRefsInSliceSections:
     def test_header_has_image_declarations(self):
         """开头【图片引用声明】保留。"""
         prompt = render_unit_prompt_premium(self._unit_with_polluted_text(), self._project_with_kyle())
-        assert "图片1：凯尔" in prompt
-        assert "图片2：近地轨道" in prompt
-        assert "图片3：D-77空港" in prompt
+        assert "@[凯尔]" in prompt
+        assert "@[近地轨道]" in prompt
+        assert "@[D-77空港]" in prompt
 
     def test_slice_sections_have_no_image_numbers(self):
         """切片段中不包含任何图片编号。"""

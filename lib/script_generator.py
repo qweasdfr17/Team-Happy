@@ -72,6 +72,79 @@ def _rewrite_episode_prefix(rid: object, ep: int) -> object:
     return new_rid
 
 
+_STEP1_UNIT_HEADER_RE = re.compile(r"^####\s+(E\d+U\d+)\s*$")
+_STEP1_SHOT_RE = re.compile(r"^Shot\s+\d+\s*\(\s*(\d+)s\s*\)\s*:\s*(.+)$")
+
+
+def _parse_reference_step1_shots(step1_md: str) -> dict[str, list[dict[str, object]]]:
+    """Extract visual shot text from ``step1_reference_units.md``."""
+    units: dict[str, list[dict[str, object]]] = {}
+    current_unit: str | None = None
+    current_shot: dict[str, object] | None = None
+    current_text: list[str] = []
+
+    def flush_shot() -> None:
+        nonlocal current_shot, current_text
+        if current_unit and current_shot is not None:
+            text = "\n".join(line.strip() for line in current_text if line.strip()).strip()
+            current_shot["text"] = text
+            units.setdefault(current_unit, []).append(current_shot)
+        current_shot = None
+        current_text = []
+
+    for raw_line in step1_md.splitlines():
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if stripped.startswith("---") or stripped.startswith("### 拆分统计"):
+            flush_shot()
+            current_unit = None
+            continue
+        header_match = _STEP1_UNIT_HEADER_RE.match(stripped)
+        if header_match:
+            flush_shot()
+            current_unit = header_match.group(1)
+            units.setdefault(current_unit, [])
+            continue
+
+        shot_match = _STEP1_SHOT_RE.match(stripped)
+        if shot_match and current_unit:
+            flush_shot()
+            current_shot = {"duration": int(shot_match.group(1))}
+            current_text = [shot_match.group(2)]
+            continue
+
+        if current_shot is not None:
+            current_text.append(line)
+
+    flush_shot()
+    return {unit_id: shots for unit_id, shots in units.items() if shots}
+
+
+def _hydrate_reference_video_unit_texts(script_data: dict, step1_md: str) -> int:
+    """Fill blank reference-video shot text from Step1, returning updated count."""
+    step1_shots = _parse_reference_step1_shots(step1_md)
+    updated = 0
+    for unit in script_data.get("video_units") or []:
+        if not isinstance(unit, dict):
+            continue
+        unit_id = str(unit.get("unit_id") or "")
+        source_shots = step1_shots.get(unit_id)
+        target_shots = unit.get("shots")
+        if not source_shots or not isinstance(target_shots, list):
+            continue
+        for index, shot in enumerate(target_shots):
+            if not isinstance(shot, dict) or index >= len(source_shots):
+                continue
+            if str(shot.get("text") or "").strip():
+                continue
+            text = str(source_shots[index].get("text") or "").strip()
+            if not text:
+                continue
+            shot["text"] = text
+            updated += 1
+    return updated
+
+
 class ScriptGenerator:
     """
     剧本生成器
@@ -259,6 +332,7 @@ class ScriptGenerator:
             episode,
             output_filename,
             reference_max_duration=reference_max_duration,
+            reference_step1_md=step1_md if gen_mode == "reference_video" else None,
         )
 
     async def _generate_and_save(
@@ -269,6 +343,7 @@ class ScriptGenerator:
         output_filename: str | None,
         *,
         reference_max_duration: int | None = None,
+        reference_step1_md: str | None = None,
     ) -> Path:
         """调用 TextBackend → 解析校验 → 补元数据 → 经写盘统一入口保存（各内容模式共用尾段）。"""
         assert self.generator is not None  # generate() 入口已检查
@@ -291,20 +366,34 @@ class ScriptGenerator:
         # reference_video 模式：先按模型上限拆分 raw units，再为每个拆分后的 unit
         # 单独套精品提示词。这样 17s 这类超上限内容不会被压回一个 17s 单 shot。
         if self.content_mode != "ad" and self._effective_generation_mode(episode) == "reference_video":
+            hydrated = _hydrate_reference_video_unit_texts(script_data, reference_step1_md or "")
+            if hydrated:
+                logger.info("reference_video hydrated %d blank shot texts from step1", hydrated)
             normalize_reference_video_script(
                 script_data,
                 episode=episode,
                 project=self.project_json,
                 max_duration=reference_max_duration,
             )
-            try:
-                from lib.reference_video.premium_prompt import apply_premium_prompt_to_unit
+            from lib.reference_video.premium_prompt import apply_premium_prompt_to_unit
 
-                for unit in script_data.get("video_units") or []:
-                    if isinstance(unit, dict):
-                        apply_premium_prompt_to_unit(unit, self.project_json)
-            except Exception:
-                logger.warning("精品提示词后处理失败，保留原版提示词", exc_info=True)
+            for unit in script_data.get("video_units") or []:
+                if not isinstance(unit, dict):
+                    continue
+                try:
+                    apply_premium_prompt_to_unit(unit, self.project_json)
+                except ValueError:
+                    logger.warning(
+                        "精品提示词后处理跳过：unit %s 缺少画面内容",
+                        unit.get("unit_id"),
+                        exc_info=True,
+                    )
+                except Exception:
+                    logger.warning(
+                        "精品提示词后处理失败：unit %s 保留原版提示词",
+                        unit.get("unit_id"),
+                        exc_info=True,
+                    )
 
         # 补充元数据
         script_data = self._add_metadata(script_data, episode)
